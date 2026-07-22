@@ -49,7 +49,7 @@ jobs:
       # Bước 6: Upload logs (nếu có lỗi)
       - name: 📝 Upload logs
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: auto-post-logs
           path: auto_post.log
