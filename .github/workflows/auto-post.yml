@@ -1,0 +1,71 @@
+name: 🌞 Hoa Huy Auto Facebook Poster
+
+on:
+  # Chạy theo lịch (7 AM và 8 PM UTC+7)
+  schedule:
+    # 7 AM UTC+7 = 12 AM UTC (0:00 UTC)
+    - cron: '0 0 * * *'
+    # 8 PM UTC+7 = 1 PM UTC (13:00 UTC)
+    - cron: '0 13 * * *'
+
+  # Cho phép chạy thủ công từ GitHub UI
+  workflow_dispatch:
+
+jobs:
+  post-to-facebook:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Bước 1: Clone repository
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      # Bước 2: Cài đặt Python
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      # Bước 3: Cài đặt dependencies
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Bước 4: Tạo file .env từ secrets
+      - name: ⚙️ Setup environment
+        run: |
+          echo "ZERNIO_API_KEY=${{ secrets.ZERNIO_API_KEY }}" >> .env
+          echo "FACEBOOK_ACCOUNT_ID=${{ secrets.FACEBOOK_ACCOUNT_ID }}" >> .env
+          echo "UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}" >> .env
+          echo "TIMEZONE=Asia/Ho_Chi_Minh" >> .env
+
+      # Bước 5: Chạy script
+      - name: 🚀 Run Facebook Auto Poster
+        run: python facebook_auto_post_advanced.py
+        timeout-minutes: 10
+
+      # Bước 6: Upload logs (nếu có lỗi)
+      - name: 📝 Upload logs
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: auto-post-logs
+          path: auto_post.log
+          retention-days: 30
+
+  # Job để kiểm tra trạng thái
+  notification:
+    runs-on: ubuntu-latest
+    needs: post-to-facebook
+    if: always()
+
+    steps:
+      - name: 📧 Notify success
+        if: success()
+        run: echo "✅ Bài đăng đã được đăng lên Facebook thành công!"
+
+      - name: ❌ Notify failure
+        if: failure()
+        run: echo "❌ Có lỗi xảy ra. Kiểm tra logs."

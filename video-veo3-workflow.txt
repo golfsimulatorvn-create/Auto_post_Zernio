@@ -1,0 +1,109 @@
+---
+name: video-veo3-workflow
+description: "Quy trình tự động sản xuất nội dung video VEO3 trọn gói: nghiên cứu chủ đề → viết kịch bản chia cảnh (prompt hình ảnh tiếng Anh + lời thoại tiếng Việt) → xuất file .md → tự động tạo video từng cảnh qua veo3.im và ghép bằng ffmpeg → soạn caption và đăng thật lên Facebook Fanpage (Fastech Việt Nam hoặc Evsafes) qua Buffer API. Kích hoạt ngay khi người dùng nói 'Làm video VEO3 về [chủ đề]', 'viết kịch bản VEO3', 'làm kịch bản video VEO3 cho...', hoặc bất kỳ yêu cầu nào kết hợp chủ đề + video VEO3 — không cần hỏi lại các bước quy trình vì đã được xác nhận trước, chỉ hỏi khi thiếu chủ đề hoặc đến các điểm cần xác nhận (mua credit, đăng bài công khai). Khác với skill video-product-marketing (dành cho video đã quay sẵn, không tạo kịch bản VEO3), post-to-facebook (chỉ soạn caption, không nghiên cứu/viết kịch bản/tạo video/đăng thật), và buffer-facebook-post (chỉ phần đăng qua API, không tạo video) — skill này là quy trình đầu-cuối bao trùm cả các phần đó."
+---
+
+# Skill: Quy trình sản xuất video VEO3 trọn gói
+
+Đây là workflow đã được người dùng xác nhận và chốt cố định. Khi người dùng nói **"Làm video VEO3 về [chủ đề]"**, thực hiện tuần tự 5 bước dưới đây. Bước 1-3 chạy hoàn toàn tự động, không dừng lại hỏi lại người dùng (trừ khi chủ đề chưa rõ ràng đến mức không thể nghiên cứu được).
+
+**Lưu ý vận hành:** file skill này đã từng bị mất khỏi thư mục skills nhiều lần trong quá trình phát triển (nguyên nhân chưa rõ — có thể phiên làm việc song song khác ghi đè). Có một scheduled task tên `check-veo3-skill-integrity` chạy hàng tuần kiểm tra file này còn tồn tại và còn đủ nội dung quan trọng không. Nếu bạn (Claude) đọc thấy file này thiếu các phần dưới đây so với mô tả, có thể đã bị ghi đè — cân nhắc báo người dùng.
+
+---
+
+## Bước 1: Nghiên cứu nhanh
+
+Chạy web search 3-5 nguồn mới nhất (ưu tiên trong 1-3 tháng gần đây) về chủ đề người dùng đưa ra. Tóm tắt thành **4-5 điểm chính**, mỗi điểm kèm trích dẫn nguồn (tên nguồn + link).
+
+---
+
+## Bước 2: Viết kịch bản VEO3
+
+Chia kịch bản thành **4-6 cảnh**, mỗi cảnh **6-10 giây** (thực tế veo3.im luôn tạo clip 8 giây/lần bất kể yêu cầu), tổng thời lượng **30-60 giây**.
+
+Mỗi cảnh trình bày theo cấu trúc:
+
+​```markdown
+### Cảnh [số] (~8 giây)
+**Prompt hình ảnh (EN):** [Mô tả chi tiết, cinematic — camera angle, lighting, chuyển động,
+bối cảnh, chủ thể. Viết tiếng Anh.]
+
+**Lời thoại (VI):** "[Câu thoại tiếng Việt cho cảnh này]"
+
+**Gợi ý âm thanh:** [nhạc nền/hiệu ứng]
+​```
+
+**Bài học quan trọng về prompt (rút ra từ thực tế chạy veo3.im):** KHÔNG yêu cầu AI render số liệu/chữ chính xác trên màn hình (ví dụ `"160-270 Wh/kg"` hiển thị dạng HUD text, hay `"270°C vs 210°C"` overlay) — loại prompt này có tỷ lệ **generation failed** cao. Thay vào đó, mô tả ý nghĩa bằng hình ảnh ẩn dụ (thanh năng lượng, vòng tròn tiến độ, kích thước tương đối...) và để lời thoại truyền tải con số. Nếu một prompt bị "Generation failed", đơn giản hóa bằng cách bỏ phần yêu cầu render text/số rồi thử lại — không bị trừ credit khi generation fail.
+
+Sau khi liệt kê hết các cảnh, thêm mục **"Prompt gộp"** — nối toàn bộ prompt các cảnh thành một đoạn tiếng Anh liền mạch (dự phòng, ít dùng vì veo3.im tạo theo từng cảnh riêng).
+
+Có thể nhúng câu thoại tiếng Việt thẳng vào cuối mỗi prompt hình ảnh dạng `Vietnamese voiceover says: "..."` — veo3.im (nền Veo 3.1) hỗ trợ audio gốc và sẽ cố gắng tạo giọng đọc kèm theo, không cần bước lồng tiếng riêng.
+
+---
+
+## Bước 3: Xuất file kịch bản
+
+Lưu kịch bản thành file `.md` tên `YYYY-MM-DD_kich-ban-video-[chu-de]-veo3.md` vào `~/outputs/`, bắt đầu bằng **"Tóm tắt điều hành"**, sau đó nguồn nghiên cứu, kịch bản theo cảnh, và prompt gộp. Hiển thị toàn bộ nội dung cho người dùng xem trong chat.
+
+---
+
+## Bước 4: Tạo video từng cảnh (tự động qua veo3.im) và ghép bằng ffmpeg
+
+Đây là pipeline đã kiểm chứng chạy được — không phải điểm dừng, trừ khi tài khoản veo3.im hết credit.
+
+### 4a. Kiểm tra credit trước khi bắt đầu
+
+1. Mở `https://veo3.im/` bằng Claude in Chrome (site này **không** bị chặn domain, khác với facebook.com).
+2. Click tên tài khoản góc trên phải → xem "Video Credits". Mỗi lần tạo tốn **10 credit** (mức Veo 3.1 Lite Video).
+3. Nếu credit không đủ cho số cảnh cần tạo (số cảnh × 10), báo người dùng và trỏ tới `https://veo3.im/pricing` — **không tự mua gói/nhập thẻ thanh toán**, đây là hành động tài chính người dùng phải tự làm.
+
+### 4b. Tạo từng clip
+
+Với mỗi cảnh, lặp lại:
+
+1. Vào Home (`https://veo3.im/`), cuộn xuống tới ô "Prompt".
+2. Click **bằng tọa độ trực tiếp** vào ô Prompt (không dùng `find` + ref ngay sau khi vừa `type` ở bước trước — ref có thể bị stale và khiến click "Generate Video" không ăn, tốn thời gian mà không tạo gì). Gõ prompt hình ảnh + `Vietnamese voiceover says: "..."` của cảnh đó.
+3. Chụp screenshot xác nhận nội dung đã vào đúng ô trước khi bấm Generate.
+4. Cuộn xuống, click nút "Generate Video" **bằng tọa độ**, chụp screenshot ngay sau đó để xác nhận đã chuyển sang trạng thái "Processing...X%" (nếu vẫn thấy nút "Generate Video" tĩnh, có nghĩa là chưa submit — thử click lại).
+5. Chờ bằng `wait` 10 giây/lần, chụp lại đến khi thấy video kết quả (thường mất 40-70 giây, hay dừng ở 90% khá lâu trước khi xong — đây là bình thường, cứ tiếp tục chờ).
+6. Nếu gặp **"Generation failed. Please try adjusting your prompt..."**: không bị trừ credit, đơn giản hóa prompt (bỏ yêu cầu render số/text chính xác — xem lưu ý ở Bước 2) rồi tạo lại.
+
+### 4c. Tải clip về
+
+1. Vào `https://veo3.im/history`.
+2. Video mới nhất luôn ở ô đầu tiên (trái). Click icon "⋮" (ba chấm, góc dưới phải khung video) → chọn **"Tải xuống"**.
+3. Kiểm tra file mới trong `C:\Users\Laptop\Downloads\` (tên file là hash ngẫu nhiên) — dùng PowerShell `Get-ChildItem Downloads -Filter *.mp4 | Sort LastWriteTime -Descending | Select -First 1` để xác nhận.
+4. Di chuyển + đổi tên file vào `~/outputs/[ten-chu-de]-clips/scene[N].mp4` để giữ đúng thứ tự.
+
+Lặp lại 4b-4c cho đến khi đủ số cảnh.
+
+### 4d. Ghép clip bằng ffmpeg
+
+1. Nếu máy chưa có ffmpeg, cài qua `winget install --id Gyan.FFmpeg -e`. Lưu ý: **PATH chỉ cập nhật ở phiên terminal mới** — nếu lệnh `ffmpeg` báo "not found" ngay sau khi cài, không phải lỗi cài đặt, chỉ cần gọi qua đường dẫn đầy đủ (dò trong `C:\Users\Laptop\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_*\ffmpeg-*\bin\ffmpeg.exe`) hoặc mở phiên mới.
+2. Kiểm tra các clip đồng nhất codec/độ phân giải/fps bằng `ffprobe` trước khi ghép (thường tất cả clip từ veo3.im đều là h264, 1280x720, 24fps, 8s — nếu vậy dùng `-c copy` để ghép nhanh không cần render lại).
+3. Tạo file danh sách nối (`concat_list.txt` với các dòng `file 'sceneN.mp4'`), chạy:
+   ​```
+   ffmpeg -f concat -safe 0 -i concat_list.txt -c copy [ten-file-cuoi].mp4
+   ​```
+4. Lưu file cuối vào `~/outputs/YYYY-MM-DD_video-[chu-de]-veo3-full.mp4`.
+
+Nếu người dùng nói không thấy/không mở được file (vì đây là phiên chạy trực tiếp trên máy họ, không phải sandbox từ xa), dùng `explorer.exe /select,"[đường dẫn đầy đủ]"` để mở File Explorer bôi đen sẵn file — đường dẫn tương đối kiểu `outputs/...` trong markdown link có thể không mở được từ giao diện chat.
+
+---
+
+## Bước 5: Soạn caption và đăng thật lên Facebook
+
+1. Dùng skill **post-to-facebook** để soạn caption dựa trên nội dung kịch bản (Tóm tắt điều hành + các điểm chính) — hỏi người dùng chọn Fanpage nào (Fastech Việt Nam hay Evsafes) nếu chưa rõ. Hiển thị caption đầy đủ cho người dùng xác nhận trước khi đăng thật.
+2. Sau khi caption được xác nhận, dùng skill **buffer-facebook-post** để đăng thật qua Buffer GraphQL API — vì facebook.com bị chặn ở tầng domain trong Claude in Chrome ("Navigation to this domain is not allowed", chặn cứng, thử lại không có tác dụng), nên KHÔNG dùng browser automation cho bước đăng.
+3. Nếu người dùng chưa có Buffer API key hợp lệ hoặc chưa kết nối Fanpage vào Buffer, dừng lại và hướng dẫn họ chuẩn bị (xem chi tiết trong skill buffer-facebook-post) thay vì cố gắng đăng qua trình duyệt.
+4. Sau khi đăng xong, lấy `externalLink` (link Facebook thật) từ Buffer API và báo cho người dùng làm bằng chứng hoàn tất.
+
+Nếu người dùng muốn dùng cách khác thay vì Buffer (ví dụ tự đăng thủ công): tôn trọng lựa chọn đó — lưu caption + đường dẫn video ra để họ tự thao tác, không ép buộc dùng Buffer.
+
+---
+
+## Lưu ý chung
+
+- Toàn bộ giao tiếp bằng **tiếng Việt**; chỉ phần "Prompt hình ảnh" và "Prompt gộp" trong kịch bản viết bằng tiếng Anh.
+- Nếu người dùng chỉ nói "Làm video VEO3 về X" mà không có chi tiết gì khác, tiến hành thẳng Bước 1-3 không hỏi lại.
+- Việc mua credit trên veo3.im, việc lấy/cung cấp Buffer API key, và việc thực sự gọi mutation đăng bài công khai lên Facebook đều là các hành động cần người dùng tự thực hiện hoặc xác nhận rõ ràng trước — không tự động hóa âm thầm.

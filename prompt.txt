@@ -1,0 +1,48 @@
+Hãy đọc /mnt/skills/examples/skill-creator/SKILL.md để hiểu cách tạo skill đúng chuẩn.
+
+Sau đó tạo cho mình 3 file dựa trên 4 file context đính kèm (brand-guideline, customer-persona, product-catalog, marketing-channels):
+---
+
+**File 1: `skills/01-social-content.md`**
+Skill viết caption Facebook (150-300từ) và Instagram (80-150 từ)
+đúng tone brand nội thất cao cấp.
+Sau khi viết caption, tự động gọi Skill 2 để tạo ảnh.
+Lưu output vào `output/content/[YYYY-MM-DD]-[sản-phẩm].md`
+
+**File 2: `skills/02-creative-designer.md`**
+Skill tạo ảnh sản phẩm bằng Nano Banana Pro (fal-ai/nano-banana-pro/edit).
+Hỗ trợ 4 loại: Lifestyle, Product Hero, Detail Shot, Human Touch.
+Chạy qua `skills/creative-api.py`, có thể gọi độc lập hoặc từ Skill 1.
+
+**File 3: `skills/creative-api.py`**
+
+Tạo file tương tự script đính kèm, với đúng pipeline này:
+1. Nhận 3 tham số: [product] [platform] "[prompt]"
+2. Load FAL_API_KEY và IMGBB_API_KEY từ .env
+3. Lấy URL ảnh gốc: kiểm tra cache trong images/image-urls.json,
+   nếu chưa có thì upload file images/[product].png lên ImgBB rồi cache lại
+4. Gọi POST https://fal.run/fal-ai/nano-banana-pro/edit
+   với body: prompt, image_urls, num_images=1, output_format=png
+5. Download ảnh về output/images/[product]-[fb|ig]-[YYYY-MM-DD]-01.png
+---
+Xuất ra 3 file riêng biệt để mình download.
+
+
+
+
+
+
+Prompt kiểm tra MCP app.portermetrics
+claude mcp add portermetrics --env POST_portermetrics_API_TOKEN=[thay bằng token của bạn] -- npx post-portermetrics-mcp
+
+
+
+
+
+
+
+
+
+
+
+	
