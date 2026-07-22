@@ -41,10 +41,10 @@ jobs:
           echo "UNSPLASH_ACCESS_KEY=${{ secrets.UNSPLASH_ACCESS_KEY }}" >> .env
           echo "TIMEZONE=Asia/Ho_Chi_Minh" >> .env
 
-      # Bước 5: Chạy script
+      # Bước 5: Chạy script (GitHub Actions version - chỉ post 1 lần)
       - name: 🚀 Run Facebook Auto Poster
-        run: python facebook_auto_post_advanced.py
-        timeout-minutes: 10
+        run: python facebook_auto_post_github.py
+        timeout-minutes: 15
 
       # Bước 6: Upload logs (nếu có lỗi)
       - name: 📝 Upload logs
