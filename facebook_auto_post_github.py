@@ -129,17 +129,21 @@ class GitHubActionsPoster:
             }
 
             payload = {
-                'platform': 'facebook',
-                'account_id': self.facebook_account_id,
                 'content': content,
-                'publish_now': True
+                'publishNow': True,
+                'platforms': [
+                    {
+                        'platform': 'facebook',
+                        'accountId': self.facebook_account_id
+                    }
+                ]
             }
 
             if image_url:
-                payload['image_url'] = image_url
+                payload['image'] = image_url
 
             response = requests.post(
-                f'{ZERNIO_BASE_URL}/v1/publish',
+                f'{ZERNIO_BASE_URL}/v1/posts',
                 headers=headers,
                 json=payload,
                 timeout=10

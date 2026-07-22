@@ -67,14 +67,18 @@ def post_to_facebook(content: str) -> bool:
         }
 
         payload = {
-            'platform': 'facebook',
-            'account_id': FACEBOOK_ACCOUNT_ID,
             'content': content,
-            'publish_now': True
+            'publishNow': True,
+            'platforms': [
+                {
+                    'platform': 'facebook',
+                    'accountId': FACEBOOK_ACCOUNT_ID
+                }
+            ]
         }
 
         response = requests.post(
-            f'{ZERNIO_BASE_URL}/v1/publish',
+            f'{ZERNIO_BASE_URL}/v1/posts',
             headers=headers,
             json=payload,
             timeout=10
