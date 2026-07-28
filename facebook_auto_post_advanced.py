@@ -7,8 +7,6 @@ import os
 from dotenv import load_dotenv
 import random
 import logging
-from urllib.parse import urlencode
-import hashlib
 
 # Load environment variables
 load_dotenv()
@@ -26,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 ZERNIO_API_KEY = os.getenv('ZERNIO_API_KEY', 'YOUR_ZERNIO_API_KEY')
-ZERNIO_BASE_URL = 'https://api.zernio.com'
+ZERNIO_BASE_URL = 'https://zernio.com/api' # Updated to match 2026 Zernio Docs
 FACEBOOK_ACCOUNT_ID = os.getenv('FACEBOOK_ACCOUNT_ID', 'YOUR_FACEBOOK_ACCOUNT_ID')
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY', '')  # Optional
 
@@ -104,20 +102,25 @@ class AdvancedFacebookPoster:
 
         try:
             url = "https://api.unsplash.com/photos/random"
+            # Translating topic to English roughly for better Unsplash results
+            search_query = "solar panel" 
+            if "pin" in topic or "lưu trữ" in topic: search_query = "battery storage"
+            if "xanh" in topic or "tái tạo" in topic: search_query = "green energy"
+            
             params = {
-                'query': topic,
-                'orientation': 'portrait',
-                'access_key': self.unsplash_key
+                'query': search_query,
+                'orientation': 'landscape',
+                'client_id': self.unsplash_key # Corrected Unsplash auth param
             }
 
             response = requests.get(url, params=params, timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 image_url = data.get('urls', {}).get('regular')
-                logger.info(f"✅ Lấy hình ảnh từ Unsplash: {topic}")
+                logger.info(f"✅ Lấy hình ảnh từ Unsplash thành công cho: {topic}")
                 return image_url
             else:
-                logger.warning(f"⚠️  Unsplash API returned {response.status_code}")
+                logger.warning(f"⚠️  Unsplash API returned {response.status_code}: {response.text}")
                 return None
         except Exception as e:
             logger.error(f"❌ Lỗi khi lấy hình ảnh: {str(e)}")
@@ -152,9 +155,19 @@ class AdvancedFacebookPoster:
                 ]
             }
 
+            # ==========================================
+            # THE FIX: Correct Zernio API format for images
+            # ==========================================
             if image_url:
-                payload['image'] = image_url
+                payload['mediaItems'] = [
+                    {
+                        'type': 'image',
+                        'url': image_url
+                    }
+                ]
+            # ==========================================
 
+            logger.info("Đang gửi request tới Zernio...")
             response = requests.post(
                 f'{ZERNIO_BASE_URL}/v1/posts',
                 headers=headers,
@@ -166,20 +179,20 @@ class AdvancedFacebookPoster:
                 logger.info(f"✅ Đăng bài thành công!")
                 logger.info(f"Content preview: {content[:80]}...")
                 if image_url:
-                    logger.info(f"Image: {image_url[:50]}...")
+                    logger.info(f"Image kèm theo: {image_url}")
                 return True
             else:
-                logger.error(f"❌ Lỗi khi đăng bài: {response.status_code}")
-                logger.error(f"Response: {response.text}")
+                logger.error(f"❌ Lỗi khi đăng bài: Code {response.status_code}")
+                logger.error(f"Response chi tiết: {response.text}")
                 return False
 
         except Exception as e:
-            logger.error(f"❌ Lỗi: {str(e)}")
+            logger.error(f"❌ Lỗi Network/Hệ thống: {str(e)}")
             return False
 
     def scheduled_post_with_image(self):
         """Job to generate and post content with image"""
-        logger.info(f"\n🔄 Đang tạo bài đăng lúc {datetime.now().strftime('%H:%M:%S')}...")
+        logger.info(f"\n🔄 Đang tạo bài đăng CÓ HÌNH ẢNH lúc {datetime.now().strftime('%H:%M:%S')}...")
         content, topic = self.generate_post_content()
 
         # Try to fetch image
@@ -189,7 +202,7 @@ class AdvancedFacebookPoster:
 
     def scheduled_post(self):
         """Job to generate and post content"""
-        logger.info(f"\n🔄 Đang tạo bài đăng lúc {datetime.now().strftime('%H:%M:%S')}...")
+        logger.info(f"\n🔄 Đang tạo bài đăng TEXT lúc {datetime.now().strftime('%H:%M:%S')}...")
         content, topic = self.generate_post_content()
         self.post_to_facebook(content)
 
@@ -198,8 +211,11 @@ class AdvancedFacebookPoster:
         schedule.every().day.at("07:00").do(self.scheduled_post_with_image)
         schedule.every().day.at("20:00").do(self.scheduled_post)
 
-        logger.info("✅ Đã lên lịch đăng bài vào 7 AM (có hình ảnh) và 8 PM")
+        logger.info("✅ Đã lên lịch đăng bài vào 7:00 (có hình ảnh) và 20:00 (chỉ text)")
         logger.info("🔄 Chương trình đang chạy... Nhấn Ctrl+C để dừng\n")
+        
+        # Uncomment this line if you want to test run immediately upon starting
+        # self.scheduled_post_with_image() 
 
         while True:
             schedule.run_pending()
@@ -211,16 +227,15 @@ if __name__ == "__main__":
     logger.info("🌞 Hoa Huy Green Energy - Advanced Auto Facebook Poster")
     logger.info("=" * 60)
     logger.info(f"⏰ Bắt đầu lúc: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    logger.info(f"📅 Lên lịch: 7 AM (có hình) & 8 PM mỗi ngày")
     logger.info("=" * 60)
 
     # Verify configuration
-    if ZERNIO_API_KEY == 'YOUR_ZERNIO_API_KEY':
-        logger.error("❌ Lỗi: Chưa cấu hình ZERNIO_API_KEY trong file .env")
+    if ZERNIO_API_KEY == 'YOUR_ZERNIO_API_KEY' or not ZERNIO_API_KEY:
+        logger.error("❌ Lỗi: Chưa cấu hình ZERNIO_API_KEY.")
         exit(1)
 
-    if FACEBOOK_ACCOUNT_ID == 'YOUR_FACEBOOK_ACCOUNT_ID':
-        logger.error("❌ Lỗi: Chưa cấu hình FACEBOOK_ACCOUNT_ID trong file .env")
+    if FACEBOOK_ACCOUNT_ID == 'YOUR_FACEBOOK_ACCOUNT_ID' or not FACEBOOK_ACCOUNT_ID:
+        logger.error("❌ Lỗi: Chưa cấu hình FACEBOOK_ACCOUNT_ID.")
         exit(1)
 
     if not UNSPLASH_ACCESS_KEY:
