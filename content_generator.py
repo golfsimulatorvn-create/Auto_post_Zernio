@@ -1,13 +1,18 @@
 """
-Bộ sinh nội dung chuẩn SEO cho Hoa Huy Green Energy.
+Bộ sinh nội dung chuẩn SEO cho SVPsolar — lĩnh vực điện mặt trời.
 
-Mục tiêu:
+Nguyên tắc thiết kế:
 - Mỗi bài đăng có phần thân >= 300 từ (không tính hashtag).
 - Cấu trúc chuẩn SEO: hook chứa từ khóa chính trong ~125 ký tự đầu, mở bài,
-  3 phần thân có tiêu đề phụ, khối E-E-A-T (nhà máy + chứng nhận), CTA, hashtag.
-- Chỉ dùng số liệu đã công bố trong product-catalog.md / brand-guideline.md.
-  Không bịa thông số (số chu kỳ sạc, giá, kích thước chưa công bố).
-- Tone theo brand-guideline: kỹ thuật, đáng tin cậy, hạn chế emoji.
+  3 phần thân có tiêu đề phụ, khối uy tín (E-E-A-T), phần kết, CTA, hashtag.
+- **Không bịa số liệu.** Phần thân chỉ chứa kiến thức kỹ thuật điện mặt trời
+  mang tính phổ quát, không khẳng định gì riêng về công ty. Mọi thông tin
+  thương hiệu (tên, hotline, website, số năm kinh nghiệm, chứng nhận...) đều
+  lấy từ brand_config.json — trường nào bỏ trống thì phần nội dung tương ứng
+  bị bỏ qua, không có giá trị mặc định tự chế.
+- Các con số tiết kiệm/hoàn vốn/sản lượng phụ thuộc bức xạ khu vực, hướng mái
+  và mức tiêu thụ, nên nội dung luôn dẫn về "cần khảo sát thực tế" thay vì đưa
+  ra con số cụ thể.
 """
 
 from __future__ import annotations
@@ -24,1070 +29,935 @@ from pathlib import Path
 
 MIN_BODY_WORDS = 300
 
-HISTORY_FILE = Path(__file__).parent / "output" / "post_history.json"
+BASE_DIR = Path(__file__).parent
+HISTORY_FILE = BASE_DIR / "output" / "post_history.json"
+BRAND_CONFIG_FILE = BASE_DIR / "brand_config.json"
 HISTORY_SIZE = 40
 
-BRAND_HASHTAGS = ["#HoaHuyGreenEnergy", "#PinLithium", "#LiFePO4"]
+BRAND_HASHTAGS = ["#SVPsolar", "#DienMatTroi", "#NangLuongMatTroi"]
 
-CONTACT_LINE = "Mr. Hiếu — 0904.789.969 | hoahuy.com"
+# Trường bắt buộc phải có thì mới được phép đăng bài
+REQUIRED_BRAND_FIELDS = ["company_name", "website", "hotline"]
+
+# Nhãn hiển thị khi trường còn trống — cố tình để dễ thấy trong bản xem thử
+FIELD_PLACEHOLDERS = {
+    "company_name": "«TÊN CÔNG TY»",
+    "website": "«WEBSITE»",
+    "hotline": "«HOTLINE»",
+}
 
 
-# --- Khối E-E-A-T dùng chung: năng lực nhà máy, chứng nhận, con người -------
-PROOF_BLOCKS = [
-    (
-        "Năng lực sản xuất trong nước",
-        "Toàn bộ sản phẩm được lắp ráp tại nhà máy Hoa Huy Green Energy — Lô CN03, "
-        "KCN Thái Hà, xã Bắc Lý, tỉnh Ninh Bình. Nhà máy có hơn 200 nhân sự, trong đó "
-        "100% kỹ thuật viên được đào tạo về an toàn hóa chất, an toàn điện và vận hành "
-        "pin lithium. Sản xuất trong nước đồng nghĩa với thời gian giao hàng ngắn hơn "
-        "hàng nhập khẩu, và quan trọng hơn với khách hàng B2B là khả năng bảo hành, "
-        "thay thế và hỗ trợ kỹ thuật tại chỗ khi có sự cố.",
-    ),
-    (
-        "Chứng nhận quốc tế đầy đủ",
-        "Sản phẩm Hoa Huy đáp ứng bộ tiêu chuẩn UL1642, UL1973, IEC62619, IEC62133 và "
-        "UN38.3, cùng hệ thống quản lý chất lượng ISO 9001:2015 và quản lý môi trường "
-        "ISO 14001:2015. Đây chính là bộ hồ sơ thường được yêu cầu khi tham gia đấu "
-        "thầu, ký hợp đồng xuất khẩu hoặc vận chuyển pin lithium bằng đường hàng không "
-        "và đường biển. Với chủ đầu tư, chứng nhận là cách kiểm chứng chất lượng khách "
-        "quan thay vì chỉ tin vào lời giới thiệu của nhà cung cấp.",
-    ),
-    (
-        "Kiểm soát chất lượng đa công đoạn",
-        "Quy trình sản xuất áp dụng dây chuyền hàn laser công suất cao và kiểm soát "
-        "chất lượng qua nhiều công đoạn trước khi xuất xưởng, theo hệ thống ISO "
-        "9001:2015 mà nhà máy đang vận hành. Cell được phân loại trước khi lắp ráp để "
-        "các cell trong cùng một khối pin có thông số đồng đều — yếu tố ảnh hưởng trực "
-        "tiếp đến tuổi thọ thực tế của cả bộ pin, bởi một khối pin thường xuống cấp "
-        "theo cell yếu nhất trong đó.",
-    ),
-    (
-        "Đồng hành kỹ thuật, không chỉ bán hàng",
-        "Ngoài sản phẩm tiêu chuẩn, Hoa Huy cung cấp dịch vụ OEM/ODM, thiết kế kiến "
-        "trúc pin và BMS theo yêu cầu, hiệu chuẩn và kiểm tra chất lượng pin, cho thuê "
-        "pin lưu trữ công nghiệp và giải pháp hoán đổi pin (battery swapping). Đội kỹ "
-        "thuật tham gia từ khâu khảo sát nhu cầu vận hành thực tế, nên cấu hình đề "
-        "xuất bám sát bài toán của khách hàng thay vì chỉ chọn một mã sản phẩm có sẵn "
-        "trong danh mục.",
-    ),
+# --- Nạp và kiểm tra cấu hình thương hiệu -----------------------------------
+def load_brand(path: Path | None = None) -> dict:
+    """Đọc brand_config.json. Thiếu file thì trả về cấu hình rỗng."""
+    path = path or BRAND_CONFIG_FILE
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+    return {k: v for k, v in data.items() if not k.startswith("_")}
+
+
+def missing_brand_fields(brand: dict | None = None) -> list[str]:
+    """Danh sách trường bắt buộc còn trống."""
+    brand = load_brand() if brand is None else brand
+    return [f for f in REQUIRED_BRAND_FIELDS if not str(brand.get(f, "")).strip()]
+
+
+def brand_is_ready(brand: dict | None = None) -> bool:
+    return not missing_brand_fields(brand)
+
+
+def _has(brand: dict, *fields: str) -> bool:
+    """Kiểm tra các trường tùy chọn đã được điền hay chưa."""
+    for f in fields:
+        value = brand.get(f)
+        if isinstance(value, list):
+            if not value:
+                return False
+        elif not str(value or "").strip():
+            return False
+    return True
+
+
+def _fill(text: str, brand: dict) -> str:
+    """Thay các token thương hiệu bằng giá trị thật (hoặc nhãn còn trống)."""
+    values = {
+        "company": brand.get("company_name") or FIELD_PLACEHOLDERS["company_name"],
+        "website": brand.get("website") or FIELD_PLACEHOLDERS["website"],
+        "hotline": brand.get("hotline") or FIELD_PLACEHOLDERS["hotline"],
+        "sales": brand.get("sales_contact") or brand.get("hotline")
+                 or FIELD_PLACEHOLDERS["hotline"],
+        "area": brand.get("service_area", ""),
+        "years": str(brand.get("years_experience", "")),
+        "projects": str(brand.get("projects_completed", "")),
+        "warranty": str(brand.get("warranty_years", "")),
+        "certs": ", ".join(brand.get("certifications", []) or []),
+        "brands": ", ".join(brand.get("partner_brands", []) or []),
+    }
+    for token, value in values.items():
+        text = text.replace("{" + token + "}", value)
+    return text
+
+
+def contact_line(brand: dict) -> str:
+    parts = [brand.get("hotline") or FIELD_PLACEHOLDERS["hotline"]]
+    if brand.get("email"):
+        parts.append(brand["email"])
+    parts.append(brand.get("website") or FIELD_PLACEHOLDERS["website"])
+    return " | ".join(parts)
+
+
+# --- Khối uy tín (E-E-A-T) --------------------------------------------------
+# `requires` là các trường tùy chọn bắt buộc phải có thì khối mới được dùng.
+# Khối đầu tiên chỉ cần company_name nên luôn khả dụng.
+PROOF_TEMPLATES = [
+    {
+        "title": "Khảo sát trước, báo giá sau",
+        "requires": [],
+        "body": "Một hệ điện mặt trời chỉ hiệu quả khi được thiết kế theo đúng mái và "
+                "đúng mức tiêu thụ của từng công trình. Vì vậy quy trình chuẩn của "
+                "{company} là khảo sát hiện trạng trước — đo diện tích và hướng mái, "
+                "đánh giá kết cấu chịu lực, ghi nhận bóng che theo giờ trong ngày và "
+                "đối chiếu hóa đơn điện thực tế — rồi mới đưa ra phương án công suất và "
+                "báo giá. Cách làm này tránh tình trạng lắp thừa công suất gây lãng phí "
+                "hoặc lắp thiếu khiến hệ không đáp ứng đủ nhu cầu.",
+    },
+    {
+        "title": "Kinh nghiệm triển khai thực tế",
+        "requires": ["years_experience", "projects_completed"],
+        "body": "{company} đã có {years} năm hoạt động trong lĩnh vực điện mặt trời, với "
+                "{projects} công trình đã bàn giao. Kinh nghiệm tích lũy qua nhiều dạng "
+                "mái và nhiều mức công suất khác nhau là thứ tạo ra khác biệt ở khâu xử "
+                "lý chi tiết: cách đi dây, cách bố trí chuỗi tấm pin để hạn chế ảnh hưởng "
+                "của bóng che, và cách xử lý chống thấm tại các điểm bắt giá đỡ — những "
+                "việc quyết định độ bền của cả hệ thống về sau.",
+    },
+    {
+        "title": "Phạm vi thi công và hỗ trợ tại chỗ",
+        "requires": ["service_area"],
+        "body": "{company} triển khai thi công tại {area}. Với điện mặt trời, khả năng hỗ "
+                "trợ tại chỗ quan trọng hơn nhiều người nghĩ: hệ thống vận hành ngoài "
+                "trời suốt 20 năm trở lên, nên khi cần kiểm tra inverter, siết lại đầu "
+                "nối hay xử lý cảnh báo lỗi, đơn vị thi công ở gần sẽ phản hồi nhanh hơn "
+                "hẳn so với nhà cung cấp ở xa hoặc bán hàng qua trung gian.",
+    },
+    {
+        "title": "Thiết bị và tiêu chuẩn áp dụng",
+        "requires": ["certifications"],
+        "body": "Hệ thống do {company} lắp đặt áp dụng các tiêu chuẩn: {certs}. Với chủ "
+                "đầu tư, tiêu chuẩn và chứng nhận là cách kiểm chứng chất lượng khách "
+                "quan thay vì chỉ dựa vào lời giới thiệu — đặc biệt quan trọng với thiết "
+                "bị phải phơi nắng mưa liên tục trong hàng chục năm và đấu nối trực tiếp "
+                "vào hệ điện của công trình.",
+    },
+    {
+        "title": "Thiết bị từ các hãng có bảo hành chính hãng",
+        "requires": ["partner_brands"],
+        "body": "{company} sử dụng thiết bị từ các thương hiệu: {brands}. Điều đáng quan "
+                "tâm với tấm pin và inverter không chỉ là thông số lúc mới lắp, mà là "
+                "chính sách bảo hành có thực hiện được hay không sau nhiều năm. Thiết bị "
+                "có kênh bảo hành chính hãng rõ ràng giúp chủ đầu tư tránh rủi ro khi cần "
+                "thay thế linh kiện ở giai đoạn giữa vòng đời hệ thống.",
+    },
+    {
+        "title": "Bảo hành và đồng hành sau nghiệm thu",
+        "requires": ["warranty_years"],
+        "body": "Hệ thống do {company} lắp đặt được bảo hành {warranty} năm. Điện mặt "
+                "trời là khoản đầu tư dài hạn, nên phần việc sau nghiệm thu — kiểm tra "
+                "định kỳ, theo dõi sản lượng, xử lý khi có cảnh báo — mới là thứ quyết "
+                "định hệ thống có đạt hiệu quả như kỳ vọng trong suốt vòng đời hay không.",
+    },
 ]
 
-CTA_BLOCKS = [
-    "Anh/chị đang cần tư vấn cấu hình phù hợp với nhu cầu vận hành thực tế? Liên hệ "
-    f"phòng kinh doanh Hoa Huy Green Energy: {CONTACT_LINE}. Đội kỹ thuật sẽ trao đổi "
-    "về dải điện áp, dung lượng và điều kiện lắp đặt trước khi đề xuất phương án.",
-    "Cần báo giá hoặc hồ sơ kỹ thuật đầy đủ cho dự án của mình? Liên hệ Hoa Huy Green "
-    f"Energy: {CONTACT_LINE}. Chúng tôi hỗ trợ cả phương án mẫu thử (pilot) trước khi "
-    "khách hàng quyết định đặt số lượng lớn.",
-    "Anh/chị muốn so sánh trực tiếp với giải pháp đang dùng? Gửi thông số hệ thống "
-    f"hiện tại cho đội kỹ thuật Hoa Huy Green Energy: {CONTACT_LINE} để nhận phân tích "
-    "cụ thể theo điều kiện vận hành của mình.",
+CTA_TEMPLATES = [
+    "Anh/chị muốn biết mái nhà mình lắp được công suất bao nhiêu? Liên hệ {company} để "
+    "được khảo sát và tư vấn theo hiện trạng thực tế: {contact}.",
+    "Cần báo giá cụ thể cho công trình của mình? Gửi hóa đơn tiền điện gần nhất và thông "
+    "tin mái cho đội kỹ thuật {company}: {contact}. Phương án sẽ được tính theo mức tiêu "
+    "thụ thật thay vì áp một cấu hình có sẵn.",
+    "Anh/chị đang phân vân giữa các phương án đã nhận báo giá? Liên hệ {company} qua "
+    "{contact} để được phân tích ưu nhược điểm từng cấu hình theo điều kiện công trình "
+    "của mình.",
 ]
 
 
 # --- Dữ liệu chủ đề ---------------------------------------------------------
-# Mỗi chủ đề: từ khóa chính, từ khóa phụ (LSI), hook, mở bài, >=4 phần thân,
-# hashtag riêng và mô tả ảnh (alt text phục vụ SEO ảnh).
+# Phần thân cố tình KHÔNG chứa khẳng định riêng về công ty — chỉ là kiến thức
+# kỹ thuật điện mặt trời phổ quát. Thông tin thương hiệu nằm ở khối uy tín và CTA.
 TOPICS: list[dict] = [
     {
-        "id": "pin-xe-may-dien",
-        "focus_keyword": "pin lithium xe máy điện",
-        "secondary_keywords": [
-            "cell LiFePO4",
-            "đội xe máy điện",
-            "tuổi thọ pin",
-            "dải điện áp",
-        ],
-        "closings": [
-            "Tóm lại, chọn pin lithium xe máy điện là bài toán cân giữa chi phí đầu tư "
-            "ban đầu, tuổi thọ pin và độ an toàn của cell LiFePO4 — nên bắt đầu từ điều "
-            "kiện vận hành thật của đội xe máy điện thay vì chỉ so sánh giá niêm yết.",
-            "Nói ngắn gọn, một bộ pin lithium xe máy điện tốt được đánh giá qua tuổi thọ "
-            "pin sau hàng nghìn chu kỳ, chất lượng cell LiFePO4 và mức độ khớp với dải "
-            "điện áp của xe — ba yếu tố quyết định chi phí thật của cả đội xe máy điện.",
-        ],
-        "image_query": "electric motorbike battery",
-        "image_alt": "Pin lithium xe máy điện LiFePO4 Hoa Huy Green Energy sản xuất tại Ninh Bình",
+        "id": "dien-mat-troi-ap-mai",
+        "focus_keyword": "điện mặt trời áp mái",
+        "secondary_keywords": ["hóa đơn tiền điện", "công suất hệ thống",
+                               "khảo sát mái", "tự tiêu thụ"],
+        "image_query": "rooftop solar panels residential house",
+        "image_alt": "Hệ thống điện mặt trời áp mái lắp đặt cho nhà ở dân dụng",
         "hooks": [
-            "Pin lithium xe máy điện: chọn đúng ngay từ đầu để không phải thay sớm.",
-            "Pin lithium xe máy điện LiFePO4 — vì sao đang thay thế dần ắc quy chì?",
-            "Đánh giá pin lithium xe máy điện: nhìn vào đâu ngoài con số Ah?",
+            "Điện mặt trời áp mái: lắp bao nhiêu kW là đủ cho gia đình mình?",
+            "Điện mặt trời áp mái — những gì cần biết trước khi xuống tiền.",
+            "Điện mặt trời áp mái cho nhà ở: bắt đầu từ hóa đơn tiền điện, không phải từ báo giá.",
         ],
         "intros": [
-            "Khi chọn pin lithium xe máy điện, phần lớn người dùng chỉ nhìn vào dung "
-            "lượng Ah và quãng đường đi được sau mỗi lần sạc. Nhưng với chủ đội xe hay "
-            "đại lý, con số quyết định lại là độ ổn định sau hàng nghìn chu kỳ sạc/xả "
-            "và mức độ an toàn nhiệt khi vận hành liên tục. Dưới đây là những yếu tố kỹ "
-            "thuật nên cân nhắc trước khi xuống tiền cho cả một đội xe.",
-            "Thị trường pin lithium xe máy điện hiện có rất nhiều mức giá, và chênh "
-            "lệch giữa các lựa chọn thường nằm ở những thứ không nhìn thấy được từ bên "
-            "ngoài: loại cell, chất lượng mối hàn, thiết kế BMS và quy trình kiểm soát "
-            "chất lượng. Bài viết này phân tích các tiêu chí kỹ thuật giúp anh/chị so "
-            "sánh giữa các nhà cung cấp một cách có cơ sở.",
+            "Câu hỏi đầu tiên của hầu hết gia đình khi tìm hiểu điện mặt trời áp mái là "
+            "\"lắp bao nhiêu kW\". Nhưng đó lại là câu hỏi nên trả lời sau cùng. Công suất "
+            "phù hợp phụ thuộc vào mức tiêu thụ thật, diện tích và hướng mái, cùng thói "
+            "quen dùng điện trong ngày của gia đình. Dưới đây là những yếu tố cần nắm "
+            "trước khi so sánh các báo giá.",
+            "Điện mặt trời áp mái không còn xa lạ, nhưng chênh lệch giữa các báo giá vẫn "
+            "khiến nhiều gia đình bối rối. Phần lớn khác biệt nằm ở những thứ không hiện "
+            "trên tờ báo giá: chất lượng inverter, cách thiết kế chuỗi tấm pin và cách xử "
+            "lý chống thấm khi thi công. Bài viết này giúp anh/chị biết cần hỏi gì.",
         ],
         "sections": [
-            (
-                "Cell LiFePO4 — nền tảng của độ an toàn",
-                "Điểm khác biệt lớn nhất của pin lithium xe máy điện Hoa Huy nằm ở hóa "
-                "học cell: LiFePO4 (lithium sắt phốt phát). So với các dòng lithium phổ "
-                "thông khác, LiFePO4 được đánh giá cao về độ ổn định nhiệt và độ bền chu "
-                "kỳ — hai yếu tố quyết định trực tiếp đến rủi ro cháy nổ và tuổi thọ "
-                "thực tế. Với xe máy điện hoạt động ngoài trời, chịu nắng nóng và rung "
-                "xóc liên tục, đặc tính an toàn nhiệt của cell không phải là chi tiết "
-                "kỹ thuật phụ mà là điều kiện bắt buộc.",
-            ),
-            (
-                "Thông số thực tế của dòng pin xe máy điện Hoa Huy",
-                "Mã HHXM6025A2 là bộ ắc quy LiFePO4 60V/25Ah, năng lượng 1.500Wh, cấp "
-                "bảo vệ IP65 chống bụi và nước, khối lượng 13,5kg, kích thước 263 x 170 "
-                "x 165mm — phù hợp các dòng xe máy điện tầm trung. Mã HHXM7230B ở phân "
-                "khúc cao hơn với 72V/30Ah. Ngoài ra Hoa Huy còn có dải 48V (25–40Ah) "
-                "cho phân khúc phổ thông, dải 60V (25–50Ah), dải 72V (25–100Ah) và các "
-                "dòng 76V, 96V cho nhu cầu tầm hoạt động mở rộng.",
-            ),
-            (
-                "Bài toán chi phí vận hành cho đội xe",
-                "Với một đội xe vài chục đến vài trăm chiếc, chi phí thực sự không nằm ở "
-                "giá mua ban đầu mà ở tổng chi phí sở hữu: số lần phải thay pin trong "
-                "vòng đời xe, thời gian xe nằm chờ sửa và rủi ro dừng vận hành đột "
-                "xuất. Một bộ pin rẻ hơn nhưng phải thay sớm hơn, kèm theo những ngày xe "
-                "không chạy được, thường đắt hơn đáng kể khi tính trên toàn đội xe và "
-                "cả chu kỳ khai thác.",
-            ),
-            (
-                "Tương thích và lắp đặt",
-                "Trước khi chọn pin lithium xe máy điện, cần xác định đúng ba thông số: "
-                "dải điện áp danh định của xe, không gian khoang chứa pin và kiểu đầu "
-                "nối. Sai lệch điện áp có thể khiến bộ điều khiển không nhận pin hoặc "
-                "hoạt động sai thông số thiết kế. Đội kỹ thuật Hoa Huy hỗ trợ đối chiếu "
-                "thông số xe hiện có trước khi đề xuất mã pin, đặc biệt với các trường "
-                "hợp thay thế pin cho đội xe đã vận hành nhiều năm.",
-            ),
-            (
-                "Bảo hành và hỗ trợ sau bán hàng",
-                "Với khách hàng B2B, tốc độ phản hồi khi có sự cố kỹ thuật quan trọng "
-                "không kém chất lượng sản phẩm. Vì pin được sản xuất ngay trong nước, "
-                "quy trình kiểm tra, bảo hành và thay thế không phải chờ chu kỳ nhập "
-                "khẩu như hàng ngoại nhập. Đây là khác biệt rõ rệt khi một sự cố nhỏ có "
-                "thể khiến nhiều xe trong đội phải dừng hoạt động cùng lúc.",
-            ),
+            ("Hệ thống hoạt động thế nào",
+             "Tấm pin đặt trên mái hấp thụ ánh sáng và tạo ra dòng điện một chiều. "
+             "Inverter chuyển dòng điện đó thành điện xoay chiều để dùng cho các thiết "
+             "bị trong nhà. Lượng điện tạo ra sẽ ưu tiên cấp cho tải đang hoạt động; "
+             "phần dư có thể phát lên lưới hoặc nạp vào pin lưu trữ nếu hệ thống có "
+             "trang bị. Hiểu đúng thứ tự này giúp anh/chị hình dung được vì sao thói "
+             "quen dùng điện ban ngày lại ảnh hưởng lớn đến hiệu quả đầu tư."),
+            ("Bắt đầu từ hóa đơn tiền điện",
+             "Cách xác định công suất hợp lý là đi từ hóa đơn tiền điện của vài tháng "
+             "gần nhất, kết hợp với biểu đồ sử dụng trong ngày. Gia đình có người ở nhà "
+             "ban ngày, dùng điều hòa hoặc máy lạnh vào giờ nắng, sẽ tận dụng được "
+             "nhiều điện tự sản xuất hơn so với gia đình chỉ sinh hoạt vào buổi tối. "
+             "Cùng một công suất lắp đặt, hiệu quả thực tế của hai trường hợp này khác "
+             "nhau đáng kể."),
+            ("Mái nhà thế nào thì lắp được",
+             "Ba yếu tố cần đánh giá: diện tích khả dụng, hướng và độ dốc mái, và kết "
+             "cấu chịu lực. Ở Việt Nam, mái hướng nam thường nhận được bức xạ tốt nhất "
+             "trong ngày, nhưng mái hướng đông hoặc tây vẫn khai thác được với sản lượng "
+             "thấp hơn. Mái tôn, mái ngói hay mái bằng đều có giải pháp giá đỡ riêng — "
+             "điều quan trọng là kết cấu phải chịu được tải trọng tăng thêm và các điểm "
+             "bắt vít phải được xử lý chống thấm đúng cách."),
+            ("Bóng che — yếu tố hay bị bỏ qua",
+             "Một tán cây, bồn nước hay nhà bên cạnh cao hơn đều có thể che nắng một "
+             "phần mái vào những giờ nhất định. Với tấm pin nối chuỗi, bóng che lên một "
+             "tấm có thể kéo giảm sản lượng của cả chuỗi. Đây là lý do khảo sát cần ghi "
+             "nhận bóng che theo giờ trong ngày, chứ không chỉ nhìn mái một lần. Khi "
+             "không tránh được bóng che, có thể xử lý bằng cách chia chuỗi hợp lý hoặc "
+             "dùng thiết bị tối ưu cho từng tấm."),
+            ("Những chi phí cần tính đủ",
+             "Ngoài tấm pin và inverter, chi phí trọn gói còn gồm khung giá đỡ, dây dẫn "
+             "và tủ điện DC/AC, thiết bị bảo vệ, nhân công thi công và phần hoàn thiện "
+             "chống thấm. Khi so sánh các báo giá, nên yêu cầu liệt kê rõ từng hạng mục "
+             "thay vì chỉ nhìn tổng tiền — chênh lệch thường nằm ở chất lượng những "
+             "hạng mục ít được nhắc tới này, và chính chúng ảnh hưởng đến độ bền của hệ "
+             "thống về lâu dài."),
         ],
-        "hashtags": ["#PinXeMayDien", "#XeMayDien", "#PinXeDien", "#NangLuongXanh"],
+        "closings": [
+            "Tóm lại, hiệu quả của điện mặt trời áp mái được quyết định từ khâu khảo sát "
+            "mái và đọc hóa đơn tiền điện, chứ không phải từ việc chọn công suất hệ thống "
+            "lớn nhất trong khả năng. Tỷ lệ tự tiêu thụ càng cao thì khoản đầu tư càng "
+            "phát huy giá trị.",
+            "Nói ngắn gọn, trước khi chốt điện mặt trời áp mái, hãy có trong tay ba thứ: "
+            "hóa đơn tiền điện vài tháng gần nhất, kết quả khảo sát mái, và tỷ lệ tự tiêu "
+            "thụ ước tính. Công suất hệ thống nên là kết luận rút ra từ ba dữ liệu đó.",
+        ],
+        "hashtags": ["#DienMatTroiApMai", "#DienNangLuongMatTroi", "#TietKiemDien", "#SolarVietNam"],
     },
     {
-        "id": "ess-ho-gia-dinh",
-        "focus_keyword": "hệ thống lưu trữ năng lượng ESS",
-        "secondary_keywords": [
-            "pin lưu trữ LiFePO4",
-            "điện mặt trời áp mái",
-            "dung lượng kWh",
-            "kiểu dáng lắp đặt",
-        ],
-        "closings": [
-            "Nói ngắn gọn, một hệ thống lưu trữ năng lượng ESS phù hợp là hệ được chọn "
-            "theo mức tiêu thụ thật và điều kiện lắp đặt thật — từ dung lượng kWh, kiểu "
-            "dáng lắp đặt cho đến khả năng ghép với hệ điện mặt trời áp mái sẵn có. Pin "
-            "lưu trữ LiFePO4 của Hoa Huy có đủ ba kiểu dáng để bám theo mặt bằng thực tế.",
-            "Tóm lại, đầu tư hệ thống lưu trữ năng lượng ESS nên bắt đầu từ hóa đơn điện "
-            "và công suất điện mặt trời áp mái đang có, rồi mới chốt dung lượng kWh và "
-            "kiểu dáng lắp đặt. Pin lưu trữ LiFePO4 cho phép mở rộng dần thay vì phải "
-            "tính đúng ngay từ lần đầu.",
-        ],
-        "image_query": "home battery energy storage system",
-        "image_alt": "Hệ thống lưu trữ năng lượng ESS LiFePO4 Hoa Huy cho hộ gia đình dùng điện mặt trời",
+        "id": "dien-mat-troi-doanh-nghiep",
+        "focus_keyword": "điện mặt trời cho doanh nghiệp",
+        "secondary_keywords": ["nhà xưởng", "giờ cao điểm", "chi phí sản xuất", "mái tôn"],
+        "image_query": "solar panels factory warehouse roof industrial",
+        "image_alt": "Hệ thống điện mặt trời lắp trên mái nhà xưởng công nghiệp",
         "hooks": [
-            "Hệ thống lưu trữ năng lượng ESS: giải bài toán điện mặt trời chỉ phát ban ngày.",
-            "Hệ thống lưu trữ năng lượng ESS cho hộ gia đình — cần bao nhiêu kWh là đủ?",
-            "Lắp điện mặt trời rồi, có nên đầu tư thêm hệ thống lưu trữ năng lượng ESS?",
+            "Điện mặt trời cho doanh nghiệp: mái nhà xưởng đang bỏ không là tài sản chưa khai thác.",
+            "Điện mặt trời cho doanh nghiệp — vì sao nhà xưởng là nơi hiệu quả nhất?",
+            "Điện mặt trời cho doanh nghiệp: cắt chi phí điện mà không đổi dây chuyền.",
         ],
         "intros": [
-            "Điện mặt trời áp mái chỉ phát điện vào ban ngày, trong khi phần lớn hộ gia "
-            "đình lại tiêu thụ nhiều nhất vào buổi tối. Hệ thống lưu trữ năng lượng ESS "
-            "sinh ra để lấp đúng khoảng trống đó: tích điện dư ban ngày và trả lại vào "
-            "giờ cao điểm hoặc khi mất điện. Câu hỏi thực tế không phải có nên lắp hay "
-            "không, mà là chọn dung lượng và kiểu dáng nào cho phù hợp.",
-            "Với khu vực giá điện cao hoặc mất điện thường xuyên, hệ thống lưu trữ năng "
-            "lượng ESS đang trở thành phần bổ sung tự nhiên cho hệ điện mặt trời áp "
-            "mái. Tuy nhiên, chọn sai dung lượng hoặc sai kiểu lắp đặt sẽ khiến khoản "
-            "đầu tư không phát huy hết giá trị. Dưới đây là cách tiếp cận theo nhu cầu "
-            "tiêu thụ thực tế thay vì chọn theo cảm tính.",
+            "Với nhà xưởng và cơ sở sản xuất, điện là chi phí đầu vào cố định và thường "
+            "chiếm tỷ trọng đáng kể trong giá thành. Điện mặt trời cho doanh nghiệp hấp "
+            "dẫn ở chỗ tận dụng được thứ sẵn có mà không phải động đến dây chuyền: diện "
+            "tích mái xưởng thường rất lớn và hầu như không dùng vào việc gì khác.",
+            "Điện mặt trời cho doanh nghiệp có một lợi thế mà hệ dân dụng không có: giờ "
+            "sản xuất trùng gần như hoàn toàn với giờ nắng. Điều đó có nghĩa phần lớn "
+            "điện tạo ra được dùng ngay tại chỗ thay vì phải phát lên lưới — yếu tố quyết "
+            "định hiệu quả của cả khoản đầu tư.",
         ],
         "sections": [
-            (
-                "Chọn dung lượng theo mức tiêu thụ thực tế",
-                "Nguyên tắc là bắt đầu từ lượng điện cần dùng trong khoảng thời gian "
-                "muốn chủ động, chứ không phải từ dung lượng lớn nhất có thể mua. Dòng "
-                "ESS của Hoa Huy dùng cell LiFePO4 ở điện áp chuẩn 51.2V, với các mức "
-                "phổ biến: HHEA51280V01 (280Ah, 14,34 kWh) và HHEA51314V01 (314Ah, "
-                "16,08 kWh). Việc quy đổi từ hóa đơn điện hàng tháng sang nhu cầu lưu "
-                "trữ nên có kỹ thuật viên hỗ trợ, vì còn phụ thuộc vào công suất dàn "
-                "pin mặt trời đang có.",
-            ),
-            (
-                "Ba kiểu dáng cho ba điều kiện lắp đặt",
-                "Hoa Huy cung cấp ba kiểu dáng ESS để phù hợp với mặt bằng thực tế. Bản "
-                "All-In-One tích hợp sẵn các thành phần, giúp rút ngắn thời gian và chi "
-                "phí nhân công lắp đặt. Bản Stand dạng tủ đứng phù hợp phòng kỹ thuật "
-                "hoặc khu vực có sẵn không gian sàn. Bản Wall-Mount treo tường tiết "
-                "kiệm diện tích cho nhà ở đô thị. Cả ba đều có ở hai mức 280Ah và "
-                "314Ah, tương ứng khoảng 14,3 kWh và 16 kWh.",
-            ),
-            (
-                "Khả năng mở rộng cho nhà xưởng và công nghiệp",
-                "Với nhà xưởng hoặc cơ sở có nhu cầu lớn hơn, dòng Stacked ESS dạng "
-                "module xếp chồng cho phép tăng dung lượng theo từng giai đoạn thay vì "
-                "đầu tư toàn bộ ngay từ đầu. Series HHD6 có các phiên bản 5,2 / 10,4 / "
-                "15,6 / 20,9 / 26,1 kWh; series HHEC dành cho quy mô công nghiệp với "
-                "16 / 32 / 48,2 / 64,3 / 80,4 kWh. Cách tiếp cận module hóa giúp chi "
-                "phí đầu tư đi theo tốc độ tăng trưởng của tải tiêu thụ.",
-            ),
-            (
-                "An toàn khi lắp đặt trong nhà",
-                "Lo ngại phổ biến nhất khi đặt pin lưu trữ trong khu vực sinh hoạt là "
-                "an toàn cháy nổ và tản nhiệt. Đây là lý do toàn bộ dòng ESS của Hoa Huy "
-                "dùng cell LiFePO4 — hóa học pin có độ ổn định nhiệt cao hơn so với "
-                "nhiều dòng lithium phổ thông khác. Bên cạnh đó, hệ thống quản lý pin "
-                "BMS giám sát điện áp, dòng và nhiệt độ để ngắt bảo vệ khi vượt ngưỡng "
-                "an toàn trong quá trình sạc và xả.",
-            ),
-            (
-                "Tương thích với hệ inverter sẵn có",
-                "Một rủi ro thường gặp là mua pin lưu trữ về mới phát hiện không tương "
-                "thích với inverter đang dùng. Trước khi chốt phương án, cần đối chiếu "
-                "dải điện áp, giao thức truyền thông giữa BMS và inverter, cùng công "
-                "suất sạc/xả tối đa mà hệ thống hiện tại cho phép. Đội kỹ thuật Hoa Huy "
-                "hỗ trợ khâu đối chiếu này với các nhà tích hợp EPC ngay từ giai đoạn "
-                "thiết kế hệ thống.",
-            ),
+            ("Giờ sản xuất trùng giờ nắng",
+             "Đây là điểm khác biệt căn bản so với hệ gia đình. Nhà xưởng vận hành ban "
+             "ngày, đúng khung giờ hệ thống phát điện mạnh nhất, nên tỷ lệ tự tiêu thụ "
+             "thường rất cao. Điện sản xuất ra được dùng ngay cho máy móc, hệ thống làm "
+             "mát và chiếu sáng, thay vì phải phát lên lưới. Với cơ sở hoạt động cả tuần, "
+             "mức độ trùng khớp này càng lớn."),
+            ("Dịch tải khỏi khung giờ giá cao",
+             "Nhiều cơ sở sản xuất áp dụng biểu giá điện theo khung giờ, trong đó khung "
+             "cao điểm có đơn giá cao hơn hẳn. Vì hệ điện mặt trời phát mạnh vào ban "
+             "ngày, một phần đáng kể sản lượng rơi vào khung giờ có giá điện cao. Mức "
+             "tiết kiệm cụ thể phụ thuộc vào biểu giá đang áp dụng và biểu đồ phụ tải "
+             "của từng nhà máy, nên cần lấy số liệu thực tế để tính thay vì áp một tỷ lệ "
+             "chung."),
+            ("Mái tôn nhà xưởng và bài toán kết cấu",
+             "Mái tôn nhịp lớn của nhà xưởng rất phù hợp để lắp đặt, nhưng cần đánh giá "
+             "kỹ khả năng chịu tải bổ sung của hệ kèo và xà gồ, cũng như tình trạng tôn "
+             "hiện tại. Nếu mái đã cũ và dự kiến phải thay trong vài năm tới, nên cân "
+             "nhắc thay tôn trước khi lắp — vì tháo dỡ và lắp lại toàn bộ hệ thống sau "
+             "này tốn kém hơn nhiều so với xử lý ngay từ đầu."),
+            ("Giảm nhiệt cho nhà xưởng",
+             "Một lợi ích ít được nhắc tới: lớp tấm pin che phủ mái giúp giảm bức xạ "
+             "trực tiếp lên tôn, nhờ đó nhiệt độ bên trong xưởng thường dễ chịu hơn. Với "
+             "các cơ sở đang phải chạy quạt công nghiệp hoặc hệ thống làm mát liên tục, "
+             "đây là hiệu quả cộng thêm bên cạnh phần điện tiết kiệm được, dù mức độ cụ "
+             "thể còn tùy thuộc kết cấu mái và điều kiện thông gió."),
+            ("Đấu nối và vận hành song song với lưới",
+             "Hệ thống cho doanh nghiệp cần được thiết kế để vận hành an toàn song song "
+             "với nguồn lưới hiện có, bao gồm thiết bị bảo vệ, chống dòng ngược nếu cần, "
+             "và phương án ngắt khi lưới mất điện để đảm bảo an toàn cho người sửa chữa. "
+             "Đây là phần kỹ thuật cần đơn vị thi công có kinh nghiệm, vì liên quan trực "
+             "tiếp đến an toàn vận hành của cả cơ sở."),
         ],
-        "hashtags": ["#ESS", "#LuuTruNangLuong", "#DienMatTroi", "#PinLuuTru"],
+        "closings": [
+            "Tóm lại, điện mặt trời cho doanh nghiệp phát huy hiệu quả cao nhất ở nhà "
+            "xưởng có mái tôn diện tích lớn và hoạt động ban ngày, nơi phần lớn sản lượng "
+            "rơi vào giờ cao điểm và được dùng ngay tại chỗ, qua đó giảm trực tiếp chi phí "
+            "sản xuất.",
+            "Nói ngắn gọn, để đánh giá điện mặt trời cho doanh nghiệp, cần ba dữ liệu: "
+            "biểu đồ phụ tải theo giờ cao điểm, hiện trạng kết cấu mái tôn, và chi phí "
+            "điện đang chiếm bao nhiêu trong giá thành sản xuất.",
+        ],
+        "hashtags": ["#DienMatTroiCongNghiep", "#NhaXuong", "#TietKiemChiPhi", "#SolarB2B"],
     },
     {
-        "id": "lifepo4-vs-chi-axit",
-        "focus_keyword": "pin LiFePO4",
-        "secondary_keywords": [
-            "ắc quy chì axit",
-            "tuổi thọ chu kỳ",
-            "tổng chi phí sở hữu",
-            "độ sâu xả",
-        ],
-        "closings": [
-            "Kết luận: so sánh pin LiFePO4 với ắc quy chì-axit nên đặt trên tổng chi phí "
-            "sở hữu — gồm tuổi thọ chu kỳ, độ sâu xả khai thác được thực tế và chi phí "
-            "bảo trì lặp lại — thay vì chỉ nhìn vào giá mua ban đầu.",
-            "Tóm lại, khác biệt giữa pin LiFePO4 và ắc quy chì-axit nằm ở tuổi thọ chu "
-            "kỳ, độ sâu xả cho phép và khối lượng công việc bảo trì. Đưa đủ ba yếu tố này "
-            "vào bảng tính tổng chi phí sở hữu thì kết quả thường khác hẳn cảm nhận ban đầu.",
-        ],
-        "image_query": "lithium battery cells industrial",
-        "image_alt": "So sánh pin LiFePO4 Hoa Huy với ắc quy chì-axit truyền thống",
+        "id": "he-thong-hybrid",
+        "focus_keyword": "hệ thống điện mặt trời hybrid",
+        "secondary_keywords": ["pin lưu trữ", "mất điện", "inverter hybrid", "tự tiêu thụ"],
+        "image_query": "hybrid solar inverter battery storage home",
+        "image_alt": "Hệ thống điện mặt trời hybrid kết hợp pin lưu trữ và inverter hybrid",
         "hooks": [
-            "Pin LiFePO4 hay ắc quy chì-axit: so sánh trên tổng chi phí, không chỉ giá mua.",
-            "Pin LiFePO4 đắt hơn ắc quy chì — nhưng đắt hơn thật không?",
-            "Pin LiFePO4 khác ắc quy chì-axit ở đâu, ngoài trọng lượng?",
+            "Hệ thống điện mặt trời hybrid: vẫn có điện dùng khi lưới mất.",
+            "Hệ thống điện mặt trời hybrid — giải bài toán điện chỉ có ban ngày.",
+            "Hệ thống điện mặt trời hybrid có đáng đầu tư thêm so với hòa lưới thường?",
         ],
         "intros": [
-            "Khi so sánh pin LiFePO4 với ắc quy chì-axit, phép so sánh chỉ dựa trên giá "
-            "mua ban đầu gần như luôn dẫn đến kết luận sai. Hai công nghệ khác nhau về "
-            "tuổi thọ chu kỳ, độ sâu xả cho phép, hiệu suất nạp/xả và cả chi phí bảo "
-            "trì. Bài viết này phân tích các yếu tố cần đưa vào bảng tính trước khi "
-            "quyết định cho một dự án hay một đội xe.",
-            "Nhiều doanh nghiệp vẫn đang dùng ắc quy chì-axit vì quen thuộc và giá mua "
-            "thấp. Nhưng khi tính đủ chi phí trong toàn bộ vòng đời khai thác, pin "
-            "LiFePO4 thường cho kết quả khác với cảm nhận ban đầu. Dưới đây là những "
-            "khác biệt kỹ thuật có ảnh hưởng trực tiếp đến chi phí vận hành.",
+            "Hệ hòa lưới thông thường có một hạn chế nhiều người chỉ nhận ra sau khi "
+            "lắp: khi lưới mất điện, hệ thống cũng ngừng hoạt động, dù trời đang nắng. "
+            "Đó là quy định an toàn bắt buộc. Hệ thống điện mặt trời hybrid ra đời để xử "
+            "lý đúng vấn đề này, bằng cách kết hợp thêm pin lưu trữ.",
+            "Điện mặt trời phát mạnh vào ban ngày, trong khi nhiều gia đình lại tiêu thụ "
+            "nhiều nhất vào buổi tối. Hệ thống điện mặt trời hybrid lấp khoảng trống đó: "
+            "tích phần điện dư ban ngày để dùng vào buổi tối, đồng thời giữ được nguồn "
+            "khi lưới gặp sự cố.",
         ],
         "sections": [
-            (
-                "Tuổi thọ chu kỳ và tần suất thay thế",
-                "Khác biệt căn bản nằm ở số chu kỳ sạc/xả mà mỗi công nghệ chịu được "
-                "trước khi dung lượng suy giảm đáng kể. Pin LiFePO4 có độ bền chu kỳ cao "
-                "hơn rõ rệt so với ắc quy chì-axit, đồng nghĩa số lần phải thay thế "
-                "trong cùng một khoảng thời gian khai thác ít hơn. Với thiết bị vận hành "
-                "hàng ngày như xe nâng, xe golf hay hệ lưu trữ, mỗi lần thay pin đều kéo "
-                "theo chi phí vật tư, nhân công và thời gian dừng máy.",
-            ),
-            (
-                "Độ sâu xả và dung lượng dùng được thực tế",
-                "Một điểm dễ bị bỏ qua: dung lượng ghi trên nhãn không phải dung lượng "
-                "sử dụng được. Ắc quy chì-axit thường được khuyến cáo không xả quá sâu "
-                "để tránh giảm tuổi thọ nhanh, nghĩa là một phần dung lượng danh nghĩa "
-                "gần như không dùng tới. Pin LiFePO4 cho phép khai thác phần lớn dung "
-                "lượng danh định mà vẫn giữ được độ bền, nên dung lượng thực dùng trên "
-                "mỗi đồng đầu tư cao hơn đáng kể so với con số trên nhãn.",
-            ),
-            (
-                "Trọng lượng, thể tích và điều kiện lắp đặt",
-                "Với cùng một mức năng lượng, pin LiFePO4 gọn và nhẹ hơn ắc quy chì-axit. "
-                "Trên xe điện, chênh lệch trọng lượng ảnh hưởng trực tiếp đến quãng "
-                "đường và khả năng tải. Trong phòng kỹ thuật, thể tích nhỏ hơn giúp bố "
-                "trí dễ hơn và giảm yêu cầu gia cố sàn. Bộ pin HHXM6025A2 60V/25Ah của "
-                "Hoa Huy có năng lượng 1.500Wh với khối lượng 13,5kg và kích thước 263 x "
-                "170 x 165mm — mức gọn nhẹ khó đạt được với công nghệ chì-axit.",
-            ),
-            (
-                "Bảo trì và chi phí ẩn",
-                "Ắc quy chì-axit thường đòi hỏi quy trình bảo dưỡng định kỳ và điều kiện "
-                "thông gió riêng, kéo theo chi phí nhân công lặp lại mà ít được tính vào "
-                "bảng so sánh ban đầu. Pin LiFePO4 tích hợp hệ thống quản lý pin BMS "
-                "giám sát tự động các thông số vận hành, giúp giảm khối lượng công việc "
-                "bảo trì thủ công và hạn chế rủi ro do thao tác sai của người vận hành.",
-            ),
-            (
-                "Khi nào thì nên chuyển đổi?",
-                "Thời điểm hợp lý nhất để chuyển sang pin LiFePO4 thường là khi lô ắc "
-                "quy hiện tại sắp đến hạn thay thế — lúc đó chi phí chuyển đổi được so "
-                "sánh trực tiếp với chi phí mua lô ắc quy mới, thay vì bị coi là khoản "
-                "đầu tư phát sinh. Hoa Huy hỗ trợ phương án mẫu thử trên một phần đội xe "
-                "hoặc một nhánh hệ thống, để khách hàng có số liệu vận hành thực tế "
-                "trước khi chuyển đổi toàn bộ.",
-            ),
+            ("Khác biệt so với hệ hòa lưới thường",
+             "Hệ hòa lưới thường chỉ có tấm pin và inverter, điện dư phát lên lưới và "
+             "khi lưới mất thì hệ ngừng. Hệ hybrid bổ sung pin lưu trữ cùng inverter có "
+             "khả năng quản lý cả ba nguồn: tấm pin, pin lưu trữ và lưới điện. Nhờ đó hệ "
+             "có thể tự động chuyển đổi giữa các nguồn theo thứ tự ưu tiên đã cài đặt, "
+             "thay vì phụ thuộc hoàn toàn vào lưới."),
+            ("Duy trì nguồn khi mất điện",
+             "Đây là giá trị rõ rệt nhất với khu vực hay mất điện. Khi lưới gặp sự cố, "
+             "hệ hybrid chuyển sang cấp điện từ pin lưu trữ cho các tải đã được chỉ định "
+             "từ trước. Cần lưu ý: thông thường không phải toàn bộ tải trong nhà đều "
+             "được duy trì, mà chỉ nhóm tải ưu tiên được đấu riêng — vì vậy việc xác "
+             "định thiết bị nào thật sự cần chạy khi mất điện nên được bàn ngay từ khâu "
+             "thiết kế."),
+            ("Tăng tỷ lệ tự tiêu thụ",
+             "Ngoài chức năng dự phòng, pin lưu trữ giúp nâng tỷ lệ tự tiêu thụ — tức "
+             "phần điện tự sản xuất được dùng cho chính nhu cầu của mình thay vì phát "
+             "lên lưới. Với gia đình sinh hoạt chủ yếu vào buổi tối, đây là cách để "
+             "khoản đầu tư phát huy giá trị thay vì chỉ tận dụng được vài giờ ban ngày. "
+             "Mức cải thiện cụ thể phụ thuộc dung lượng pin và thói quen dùng điện."),
+            ("Chọn dung lượng pin lưu trữ",
+             "Nguyên tắc là đi từ lượng điện cần dùng trong khoảng thời gian muốn chủ "
+             "động, chứ không phải chọn dung lượng lớn nhất có thể mua. Cần liệt kê các "
+             "thiết bị ưu tiên, công suất và số giờ dự kiến chạy, từ đó suy ra dung "
+             "lượng cần thiết. Chọn dư gây đội chi phí không cần thiết, chọn thiếu thì "
+             "không đủ dùng đúng lúc cần nhất."),
+            ("Chi phí tăng thêm và điều cần cân nhắc",
+             "Hệ hybrid có chi phí cao hơn hệ hòa lưới thường do phải bổ sung pin lưu "
+             "trữ và inverter loại phù hợp. Quyết định nên dựa trên tần suất mất điện "
+             "thực tế ở khu vực và mức độ thiệt hại khi mất điện — với hộ gia đình thông "
+             "thường thì đó là bất tiện, nhưng với cơ sở kinh doanh có kho lạnh hay thiết "
+             "bị không được phép dừng thì bài toán hoàn toàn khác."),
         ],
-        "hashtags": ["#LiFePO4", "#AcQuyChi", "#TietKiemChiPhi", "#CongNghePin"],
+        "closings": [
+            "Tóm lại, hệ thống điện mặt trời hybrid đáng cân nhắc khi anh/chị cần duy trì "
+            "nguồn lúc mất điện hoặc muốn nâng tỷ lệ tự tiêu thụ. Dung lượng pin lưu trữ "
+            "nên tính từ nhóm tải ưu tiên, và inverter hybrid cần chọn đúng loại ngay từ "
+            "đầu để tránh phải thay sau này.",
+            "Nói ngắn gọn, giá trị của hệ thống điện mặt trời hybrid nằm ở hai chỗ: giữ "
+            "được điện khi mất điện, và dùng được phần điện ban ngày vào buổi tối. Cả hai "
+            "đều phụ thuộc vào việc chọn đúng dung lượng pin lưu trữ và inverter hybrid "
+            "phù hợp với mức tự tiêu thụ mong muốn.",
+        ],
+        "hashtags": ["#DienMatTroiHybrid", "#PinLuuTru", "#BackupDien", "#SolarStorage"],
     },
     {
-        "id": "pin-xe-golf",
-        "focus_keyword": "pin xe golf lithium",
-        "secondary_keywords": [
-            "cell LiFePO4",
-            "sân golf",
-            "dung lượng pin",
-            "dải điện áp",
-        ],
-        "closings": [
-            "Tóm lại, chọn pin xe golf lithium nên đi từ số vòng khai thác mỗi ngày và "
-            "địa hình sân golf, rồi mới chốt dải điện áp và dung lượng pin. Cell LiFePO4 "
-            "giúp xe giữ điện áp ổn định suốt ca thay vì yếu dần về cuối ngày.",
-            "Nói ngắn gọn, hiệu quả của pin xe golf lithium được đo bằng số xe sẵn sàng "
-            "phục vụ mỗi ngày. Chọn đúng dải điện áp và dung lượng pin theo đặc thù sân "
-            "golf, cộng với độ ổn định của cell LiFePO4, là cách rút ngắn thời gian xe "
-            "nằm chờ sạc.",
-        ],
-        "image_query": "golf cart battery",
-        "image_alt": "Pin xe golf lithium LiFePO4 Hoa Huy dải 48V đến 96V",
+        "id": "chon-tam-pin",
+        "focus_keyword": "tấm pin năng lượng mặt trời",
+        "secondary_keywords": ["hiệu suất tấm pin", "bảo hành", "suy hao", "diện tích mái"],
+        "image_query": "solar panel close up photovoltaic module",
+        "image_alt": "Cận cảnh tấm pin năng lượng mặt trời lắp trên hệ thống điện mặt trời",
         "hooks": [
-            "Pin xe golf lithium: giảm thời gian sạc, tăng số vòng khai thác mỗi ngày.",
-            "Pin xe golf lithium LiFePO4 — chọn dung lượng theo địa hình sân.",
-            "Nâng cấp pin xe golf lithium: bài toán của đơn vị vận hành sân.",
+            "Tấm pin năng lượng mặt trời: nhìn vào đâu ngoài con số Wp?",
+            "Tấm pin năng lượng mặt trời — hiệu suất cao có luôn đáng tiền hơn?",
+            "Chọn tấm pin năng lượng mặt trời: ba thông số quan trọng hơn giá.",
         ],
         "intros": [
-            "Với đơn vị vận hành sân golf, mỗi chiếc xe nằm chờ sạc là một lượt khách "
-            "không phục vụ được. Đó là lý do pin xe golf lithium đang thay thế dần ắc "
-            "quy truyền thống: thời gian sạc ngắn hơn, dung lượng khai thác được nhiều "
-            "hơn và ít yêu cầu bảo dưỡng thủ công hơn. Vấn đề còn lại là chọn đúng cấu "
-            "hình điện áp và dung lượng cho đặc thù từng sân.",
-            "Không phải sân golf nào cũng cần cùng một cấu hình pin. Địa hình đồi dốc, "
-            "số vòng khai thác mỗi ngày và loại xe đang sử dụng đều ảnh hưởng đến lựa "
-            "chọn pin xe golf lithium phù hợp. Dưới đây là cách khoanh vùng cấu hình "
-            "trước khi yêu cầu báo giá.",
+            "Khi so sánh báo giá, tấm pin năng lượng mặt trời thường được rút gọn thành "
+            "một con số công suất. Nhưng hai tấm cùng công suất vẫn có thể khác nhau về "
+            "diện tích chiếm chỗ, tốc độ suy hao theo năm và điều kiện bảo hành. Đây là "
+            "những yếu tố ảnh hưởng đến sản lượng thu được trong suốt vòng đời hệ thống.",
+            "Tấm pin là hạng mục chiếm tỷ trọng lớn trong chi phí và cũng là thứ sẽ nằm "
+            "trên mái hàng chục năm. Hiểu vài thông số cơ bản của tấm pin năng lượng mặt "
+            "trời sẽ giúp anh/chị đặt đúng câu hỏi khi so sánh giữa các nhà cung cấp, "
+            "thay vì chỉ nhìn vào tổng giá.",
         ],
         "sections": [
-            (
-                "Dải sản phẩm theo điện áp và dung lượng",
-                "Hoa Huy cung cấp pin xe golf LiFePO4 trải trên nhiều dải điện áp. Ở mức "
-                "48V có G48100 (100Ah, 4,8 kWh), G48280 (280Ah, 13,4 kWh) và G48314 "
-                "(314Ah, 15,1 kWh). Mức 60V có G60100 (6,0 kWh), G60280 (16,8 kWh), "
-                "G60314 (18,8 kWh). Mức 72V có G72100 (7,2 kWh), G72280 (20,2 kWh), "
-                "G72314 (22,6 kWh). Ngoài ra còn có mã 76280 (76V, 20,2 kWh) và dải 96V "
-                "với G96280 (26,9 kWh), G96314 (30,1 kWh) cho nhu cầu công suất cao.",
-            ),
-            (
-                "Chọn dung lượng theo số vòng khai thác",
-                "Cách chọn thực tế nhất là đi từ số vòng sân mỗi xe phải chạy trong một "
-                "ngày cao điểm, cộng thêm biên dự phòng cho địa hình dốc và điều hòa "
-                "trên xe nếu có. Chọn dư quá nhiều làm tăng chi phí đầu tư và trọng "
-                "lượng xe không cần thiết; chọn thiếu khiến xe phải sạc giữa ca, đúng "
-                "vào lúc nhu cầu phục vụ cao nhất. Đây là bài toán nên tính trên dữ liệu "
-                "vận hành thật của sân.",
-            ),
-            (
-                "Giảm thời gian dừng xe trong ngày",
-                "Ưu điểm lớn nhất của pin lithium trong môi trường sân golf là khả năng "
-                "rút ngắn thời gian xe không sẵn sàng phục vụ. Ít phải bảo dưỡng thủ "
-                "công hơn, không cần quy trình châm nước định kỳ như ắc quy chì-axit, và "
-                "điện áp giữ ổn định hơn trong suốt quá trình xả — xe không bị yếu dần "
-                "về cuối ca, điều mà khách chơi golf cảm nhận được rất rõ.",
-            ),
-            (
-                "Vận hành ngoài trời và điều kiện thời tiết",
-                "Xe golf hoạt động gần như hoàn toàn ngoài trời, chịu nắng nóng, độ ẩm "
-                "cao và rung xóc trên địa hình không bằng phẳng. Cell LiFePO4 được đánh "
-                "giá cao về độ ổn định nhiệt, phù hợp với điều kiện khí hậu Việt Nam. "
-                "Kết cấu khối pin và hệ thống BMS đóng vai trò bảo vệ khi nhiệt độ hoặc "
-                "dòng vượt ngưỡng thiết kế trong quá trình vận hành liên tục.",
-            ),
-            (
-                "Chuyển đổi cả đội xe theo giai đoạn",
-                "Không nhất thiết phải thay pin toàn bộ đội xe cùng lúc. Phương án phổ "
-                "biến là chuyển đổi theo lô, bắt đầu từ nhóm xe có tần suất khai thác "
-                "cao nhất, vừa phân bổ được chi phí đầu tư vừa thu được số liệu vận hành "
-                "thực tế trước khi mở rộng. Hoa Huy hỗ trợ cả phương án mẫu thử cho "
-                "khách hàng cần đánh giá trước khi đặt số lượng lớn.",
-            ),
+            ("Công suất và hiệu suất khác nhau thế nào",
+             "Công suất cho biết tấm pin tạo ra bao nhiêu điện trong điều kiện thử "
+             "nghiệm chuẩn. Hiệu suất cho biết tấm chuyển đổi được bao nhiêu phần năng "
+             "lượng ánh sáng chiếu tới. Hai tấm cùng công suất nhưng hiệu suất khác nhau "
+             "sẽ chiếm diện tích khác nhau — tấm hiệu suất cao hơn cần ít diện tích hơn "
+             "cho cùng một sản lượng. Điều này chỉ thực sự quan trọng khi diện tích mái "
+             "bị giới hạn."),
+            ("Khi nào nên trả thêm cho hiệu suất cao",
+             "Nếu mái rộng và còn dư chỗ, tấm hiệu suất trung bình với giá tốt hơn "
+             "thường là lựa chọn hợp lý — cứ lắp thêm tấm là bù được sản lượng. Ngược "
+             "lại, khi diện tích mái hạn chế mà nhu cầu điện lớn, tấm hiệu suất cao giúp "
+             "khai thác tối đa phần mái sẵn có. Nói cách khác, hiệu suất là câu chuyện "
+             "của diện tích, không phải câu chuyện của chất lượng."),
+            ("Suy hao theo thời gian",
+             "Tấm pin giảm dần khả năng phát điện qua các năm, và nhà sản xuất thường "
+             "công bố mức suy hao cam kết cùng công suất còn lại sau một số năm nhất "
+             "định. Đây là thông số đáng đọc kỹ khi so sánh, vì nó quyết định sản lượng "
+             "ở nửa sau vòng đời hệ thống. Nên yêu cầu nhà cung cấp đưa ra tài liệu kỹ "
+             "thuật chính thức của hãng thay vì chỉ nghe giới thiệu miệng."),
+            ("Hai loại bảo hành cần phân biệt",
+             "Tấm pin thường có hai loại bảo hành riêng biệt: bảo hành sản phẩm cho lỗi "
+             "vật lý và lỗi sản xuất, và bảo hành hiệu suất cam kết công suất còn lại "
+             "theo thời gian. Hai mốc thời gian này khác nhau và không thay thế cho "
+             "nhau. Khi so sánh, cần đối chiếu cả hai, đồng thời hỏi rõ đơn vị nào đứng "
+             "ra thực hiện bảo hành và thủ tục ra sao."),
+            ("Điều kiện vận hành thực tế tại Việt Nam",
+             "Thông số công bố được đo trong điều kiện thử nghiệm chuẩn, còn thực tế "
+             "tấm pin làm việc dưới nhiệt độ cao, độ ẩm lớn và bụi bám. Nhiệt độ cao làm "
+             "giảm hiệu suất phát điện, nên thiết kế cần đảm bảo khoảng hở thông gió "
+             "phía sau tấm. Đây là chi tiết thi công ảnh hưởng trực tiếp đến sản lượng "
+             "nhưng thường không xuất hiện trên báo giá."),
         ],
-        "hashtags": ["#PinXeGolf", "#XeGolf", "#SanGolf", "#PinLithium48V"],
+        "closings": [
+            "Tóm lại, chọn tấm pin năng lượng mặt trời nên cân giữa hiệu suất tấm pin, "
+            "mức suy hao cam kết và điều kiện bảo hành — trong đó hiệu suất chủ yếu quan "
+            "trọng khi diện tích mái bị giới hạn.",
+            "Nói ngắn gọn, đừng chọn tấm pin năng lượng mặt trời chỉ theo giá trên mỗi Wp. "
+            "Hãy đối chiếu thêm mức suy hao theo năm, cả hai loại bảo hành, và xem diện "
+            "tích mái có buộc anh/chị phải ưu tiên hiệu suất tấm pin hay không.",
+        ],
+        "hashtags": ["#TamPinMatTroi", "#PinMatTroi", "#SolarPanel", "#CongNgheSolar"],
     },
     {
-        "id": "pin-xe-nang-agv",
-        "focus_keyword": "pin xe nâng lithium",
-        "secondary_keywords": [
-            "xe AGV",
-            "cell LiFePO4",
-            "thời gian dừng máy",
-            "sạc tranh thủ",
-        ],
-        "closings": [
-            "Tóm lại, giá trị lớn nhất của pin xe nâng lithium không nằm ở thông số trên "
-            "nhãn mà ở thời gian dừng máy giảm được: sạc tranh thủ giữa ca, bỏ được khu "
-            "vực sạc riêng, và độ an toàn của cell LiFePO4 trong nhà xưởng. Với xe AGV "
-            "chạy theo lịch tự động, tính liên tục này còn quan trọng hơn nữa.",
-            "Nói ngắn gọn, bài toán pin xe nâng lithium là bài toán thời gian dừng máy. "
-            "Khả năng sạc tranh thủ trong giờ nghỉ, độ ổn định nhiệt của cell LiFePO4 và "
-            "thiết kế riêng cho từng dòng xe nâng hay xe AGV là ba yếu tố quyết định "
-            "hiệu quả thực tế.",
-        ],
-        "image_query": "forklift warehouse industrial",
-        "image_alt": "Pin xe nâng và xe AGV lithium LiFePO4 Hoa Huy cho nhà máy công nghiệp",
+        "id": "chon-inverter",
+        "focus_keyword": "inverter điện mặt trời",
+        "secondary_keywords": ["biến tần", "hiệu suất chuyển đổi", "bảo hành", "giám sát"],
+        "image_query": "solar inverter installation wall",
+        "image_alt": "Inverter điện mặt trời lắp đặt trong hệ thống năng lượng mặt trời",
         "hooks": [
-            "Pin xe nâng lithium: bỏ phòng sạc riêng, bỏ luôn quy trình thay ắc quy giữa ca.",
-            "Pin xe nâng lithium cho nhà máy chạy nhiều ca — tính lại bài toán downtime.",
-            "Pin xe nâng lithium và xe AGV: khi thời gian sạc là chi phí sản xuất.",
+            "Inverter điện mặt trời: bộ phận hay hỏng nhất, nhưng hay bị chọn qua loa nhất.",
+            "Inverter điện mặt trời — vì sao đây là nơi không nên tiết kiệm?",
+            "Inverter điện mặt trời: chọn loại nào cho mái nhà mình?",
         ],
         "intros": [
-            "Trong nhà máy chạy nhiều ca, mỗi giờ xe nâng nằm chờ sạc là một giờ gián "
-            "đoạn của cả dây chuyền phía sau. Pin xe nâng lithium thay đổi cách tổ chức "
-            "vận hành: có thể sạc tranh thủ trong các khoảng nghỉ ngắn thay vì phải "
-            "tháo lắp ắc quy giữa ca. Với đơn vị vận hành xe AGV, tính liên tục còn "
-            "quan trọng hơn nữa vì thiết bị chạy theo lịch trình tự động.",
-            "Xe nâng và xe AGV là những thiết bị mà thời gian dừng gây thiệt hại lan "
-            "sang toàn bộ chuỗi vận hành phía sau. Khi đánh giá pin xe nâng lithium, "
-            "câu hỏi không chỉ là pin chạy được bao lâu, mà là cách nó tác động đến "
-            "cách tổ chức ca kíp và mặt bằng nhà xưởng.",
+            "Tấm pin thường được bảo hành hiệu suất tới vài chục năm, còn inverter điện "
+            "mặt trời thì có vòng đời ngắn hơn đáng kể và là thiết bị làm việc liên tục "
+            "mỗi ngày. Đây cũng là hạng mục quyết định phần lớn trải nghiệm vận hành: từ "
+            "hiệu suất chuyển đổi cho tới khả năng theo dõi sản lượng.",
+            "Nếu tấm pin là phần dễ thấy nhất của hệ thống thì inverter điện mặt trời là "
+            "phần quyết định nhiều nhất tới sản lượng thực tế. Hiểu các loại inverter và "
+            "điểm mạnh của từng loại sẽ giúp anh/chị chọn đúng theo đặc điểm mái nhà "
+            "mình, thay vì chọn theo thương hiệu nghe quen.",
         ],
         "sections": [
-            (
-                "Sạc tranh thủ thay vì thay ắc quy giữa ca",
-                "Mô hình vận hành truyền thống với ắc quy chì-axit thường phải bố trí "
-                "khu vực sạc riêng, ắc quy dự phòng và quy trình tháo lắp giữa ca — kéo "
-                "theo nhân công, thiết bị nâng hạ và diện tích nhà xưởng. Pin lithium "
-                "cho phép tổ chức lại theo hướng sạc tranh thủ trong các khoảng nghỉ "
-                "ngắn của ca làm việc, giúp giảm đáng kể thời gian thiết bị không sẵn "
-                "sàng và đơn giản hóa quy trình cho tổ vận hành.",
-            ),
-            (
-                "Giải phóng diện tích và giảm yêu cầu hạ tầng",
-                "Bỏ được khu vực sạc chuyên dụng đồng nghĩa với việc thu hồi một phần "
-                "diện tích nhà xưởng cho hoạt động sản xuất. Bên cạnh đó, pin lithium "
-                "không đòi hỏi quy trình bảo dưỡng định kỳ nặng nề như ắc quy chì-axit, "
-                "giúp giảm khối lượng công việc lặp lại của bộ phận bảo trì và hạn chế "
-                "rủi ro phát sinh từ thao tác thủ công.",
-            ),
-            (
-                "Thiết kế theo yêu cầu cho thiết bị chuyên dụng",
-                "Xe nâng và xe AGV thường có yêu cầu riêng về kích thước khoang pin, vị "
-                "trí đầu nối và giao thức truyền thông với bộ điều khiển. Đây là lý do "
-                "nhóm sản phẩm này thường được triển khai theo hướng OEM/ODM: Hoa Huy "
-                "tham gia từ khâu thiết kế kiến trúc pin và BMS để bộ pin khớp với "
-                "thiết bị thực tế, thay vì buộc khách hàng chọn trong danh mục có sẵn.",
-            ),
-            (
-                "An toàn trong môi trường nhà xưởng",
-                "Trong không gian kín có nhiều người và vật tư, rủi ro cháy nổ từ pin "
-                "ảnh hưởng trực tiếp đến an toàn lao động và uy tín doanh nghiệp. Cell "
-                "LiFePO4 được lựa chọn cho nhóm sản phẩm công nghiệp chính vì độ ổn "
-                "định nhiệt cao. Hệ thống BMS giám sát liên tục điện áp, dòng và nhiệt "
-                "độ, ngắt bảo vệ khi vượt ngưỡng — lớp bảo vệ cần thiết với thiết bị vận "
-                "hành cường độ cao suốt ngày.",
-            ),
-            (
-                "Phương án thuê thay vì mua",
-                "Với doanh nghiệp muốn kiểm soát dòng tiền hoặc chưa muốn ghi nhận một "
-                "khoản đầu tư lớn ngay, Hoa Huy có dịch vụ cho thuê pin lưu trữ công "
-                "nghiệp và giải pháp hoán đổi pin (battery swapping). Đây là hướng tiếp "
-                "cận phù hợp khi nhu cầu còn biến động theo mùa vụ hoặc khi doanh nghiệp "
-                "muốn đánh giá hiệu quả thực tế trước khi đầu tư dài hạn.",
-            ),
+            ("Nhiệm vụ của inverter trong hệ thống",
+             "Tấm pin tạo ra dòng điện một chiều, còn thiết bị trong nhà dùng điện xoay "
+             "chiều. Inverter đảm nhiệm việc chuyển đổi này, đồng thời điều chỉnh để lấy "
+             "được nhiều công suất nhất có thể từ dàn pin trong từng điều kiện nắng. "
+             "Ngoài ra inverter còn xử lý phần bảo vệ và ghi nhận dữ liệu vận hành, nên "
+             "chất lượng của nó ảnh hưởng đến cả sản lượng lẫn độ an toàn."),
+            ("Inverter chuỗi — lựa chọn phổ biến",
+             "Loại này đấu nhiều tấm pin thành chuỗi và đưa về một thiết bị trung tâm. "
+             "Ưu điểm là chi phí hợp lý, lắp đặt và bảo trì đơn giản vì chỉ có một thiết "
+             "bị chính cần theo dõi. Hạn chế là khi một tấm trong chuỗi bị che nắng hoặc "
+             "suy giảm, sản lượng của cả chuỗi bị kéo theo. Phù hợp với mái thông thoáng, "
+             "ít bóng che và hướng mái đồng nhất."),
+            ("Micro inverter và bộ tối ưu công suất",
+             "Hai giải pháp này xử lý bài toán bóng che bằng cách quản lý công suất ở "
+             "cấp từng tấm thay vì cả chuỗi. Nhờ đó một tấm bị che không kéo giảm các "
+             "tấm còn lại, đồng thời cho phép theo dõi tình trạng từng tấm. Đổi lại, chi "
+             "phí đầu tư cao hơn và số thiết bị trên mái nhiều hơn. Đáng cân nhắc với "
+             "mái phức tạp, nhiều hướng hoặc không tránh được bóng che."),
+            ("Inverter hybrid khi có pin lưu trữ",
+             "Nếu có kế hoạch lắp pin lưu trữ, dù là ngay bây giờ hay vài năm tới, thì "
+             "loại inverter cần được tính từ đầu. Inverter hybrid quản lý được cả tấm "
+             "pin, pin lưu trữ và lưới điện. Chọn sai loại ngay từ đầu đồng nghĩa với "
+             "việc phải thay thiết bị khi muốn bổ sung pin về sau — khoản phát sinh hoàn "
+             "toàn tránh được nếu bàn kỹ ở khâu thiết kế."),
+            ("Bảo hành và khả năng giám sát",
+             "Vì inverter là thiết bị điện tử làm việc liên tục, chính sách bảo hành và "
+             "khả năng hỗ trợ kỹ thuật tại chỗ quan trọng không kém thông số. Nên hỏi rõ "
+             "thời hạn bảo hành, đơn vị thực hiện và thời gian xử lý khi có sự cố. Ngoài "
+             "ra, hầu hết inverter hiện nay đều có ứng dụng theo dõi sản lượng — tính "
+             "năng giúp phát hiện sớm khi hệ thống hoạt động bất thường."),
         ],
-        "hashtags": ["#PinXeNang", "#XeAGV", "#Logistics", "#NhaMayThongMinh"],
+        "closings": [
+            "Tóm lại, chọn inverter điện mặt trời nên căn cứ vào đặc điểm mái: mái thoáng "
+            "và đồng hướng thì biến tần chuỗi là đủ, mái nhiều bóng che hoặc nhiều hướng "
+            "thì nên cân nhắc giải pháp tối ưu theo từng tấm. Hiệu suất chuyển đổi, bảo "
+            "hành và khả năng giám sát là ba thứ cần đối chiếu.",
+            "Nói ngắn gọn, đừng chọn inverter điện mặt trời chỉ theo giá. Loại biến tần "
+            "phải khớp với đặc điểm mái, phải tính trước khả năng lắp pin lưu trữ, và "
+            "phải rõ ràng về bảo hành cùng khả năng giám sát từ xa.",
+        ],
+        "hashtags": ["#Inverter", "#BienTan", "#DienMatTroi", "#SolarInverter"],
     },
     {
-        "id": "oem-odm-pin-lithium",
-        "focus_keyword": "gia công pin lithium OEM ODM",
-        "secondary_keywords": [
-            "thiết kế BMS",
-            "nhà máy pin lithium",
-            "chứng nhận UN38.3",
-            "sản xuất theo yêu cầu",
-        ],
-        "closings": [
-            "Tóm lại, chọn đối tác gia công pin lithium OEM/ODM nên dựa trên ba thứ kiểm "
-            "chứng được: năng lực nhà máy pin lithium thực tế, bộ chứng nhận UN38.3 cùng "
-            "các tiêu chuẩn quốc tế, và khả năng thiết kế BMS cho sản xuất theo yêu cầu.",
-            "Nói ngắn gọn, một đối tác gia công pin lithium OEM/ODM đáng tin là bên cho "
-            "phép kiểm chứng nhà máy pin lithium tận nơi, có sẵn chứng nhận UN38.3 cho "
-            "xuất khẩu, và đủ năng lực thiết kế BMS để sản xuất theo yêu cầu riêng của "
-            "từng thiết bị.",
-        ],
-        "image_query": "battery factory production line",
-        "image_alt": "Dây chuyền gia công pin lithium OEM ODM tại nhà máy Hoa Huy Ninh Bình",
+        "id": "pin-luu-tru-solar",
+        "focus_keyword": "pin lưu trữ điện mặt trời",
+        "secondary_keywords": ["dung lượng kWh", "LiFePO4", "tự tiêu thụ", "tuổi thọ pin"],
+        "image_query": "home battery energy storage system wall mounted",
+        "image_alt": "Pin lưu trữ điện mặt trời lắp đặt cho hệ thống năng lượng mặt trời gia đình",
         "hooks": [
-            "Gia công pin lithium OEM/ODM: chọn nhà máy theo năng lực thật, không theo brochure.",
-            "Gia công pin lithium OEM/ODM tại Việt Nam — cần kiểm tra những gì trước khi ký?",
-            "Gia công pin lithium OEM/ODM: từ bản vẽ BMS đến lô sản xuất hàng loạt.",
+            "Pin lưu trữ điện mặt trời: có nên đầu tư thêm, hay để dành tiền lắp nhiều tấm hơn?",
+            "Pin lưu trữ điện mặt trời — cần bao nhiêu kWh là đủ?",
+            "Pin lưu trữ điện mặt trời: dùng điện ban ngày vào buổi tối.",
         ],
         "intros": [
-            "Với doanh nghiệp sản xuất thiết bị điện hoặc thương hiệu muốn gắn logo "
-            "riêng lên sản phẩm pin, việc chọn đối tác gia công pin lithium OEM/ODM là "
-            "quyết định dài hạn. Yếu tố quyết định không nằm ở lời giới thiệu mà ở năng "
-            "lực nhà máy thực tế: dây chuyền, chứng nhận, quy mô nhân sự và khả năng "
-            "giữ chất lượng ổn định giữa các lô sản xuất.",
-            "Tìm được nhà máy vừa đạt chuẩn quốc tế vừa đủ linh hoạt để tùy biến theo "
-            "yêu cầu riêng là bài toán khó với nhiều doanh nghiệp. Bài viết này liệt kê "
-            "những gì nên kiểm tra khi đánh giá một đối tác gia công pin lithium "
-            "OEM/ODM, dựa trên các tiêu chí mà khách hàng công nghiệp thường đưa vào "
-            "hồ sơ thẩm định nhà cung cấp.",
+            "Câu hỏi thường gặp sau khi lắp điện mặt trời là có nên bổ sung pin lưu trữ "
+            "điện mặt trời hay không. Câu trả lời phụ thuộc vào hai thứ rất cụ thể: khu "
+            "vực có hay mất điện không, và gia đình dùng điện nhiều vào ban ngày hay buổi "
+            "tối. Cùng một khoản tiền, hai trường hợp này cho hiệu quả khác hẳn nhau.",
+            "Pin lưu trữ điện mặt trời giải quyết độ lệch giữa lúc hệ thống phát điện và "
+            "lúc gia đình cần dùng. Nhưng đây cũng là hạng mục làm tăng đáng kể chi phí "
+            "đầu tư, nên cần được tính toán theo nhu cầu thật thay vì lắp cho đủ bộ.",
         ],
         "sections": [
-            (
-                "Tùy biến từ kiến trúc pin đến BMS",
-                "Gia công OEM/ODM đúng nghĩa không dừng ở việc dán nhãn lên sản phẩm có "
-                "sẵn. Hoa Huy nhận thiết kế kiến trúc pin và hệ thống quản lý pin BMS "
-                "theo yêu cầu — bao gồm hình dạng khối pin, dung lượng, dải điện áp và "
-                "các thông số bảo vệ phù hợp với thiết bị đích. Cách làm này quan trọng "
-                "với những sản phẩm có ràng buộc riêng về không gian lắp đặt hoặc giao "
-                "thức truyền thông với bộ điều khiển.",
-            ),
-            (
-                "Hồ sơ chứng nhận sẵn sàng cho xuất khẩu",
-                "Với đối tác có kế hoạch xuất khẩu, bộ chứng nhận của nhà máy quyết định "
-                "sản phẩm có ra được thị trường mục tiêu hay không. Hoa Huy đáp ứng "
-                "UL1642, UL1973, IEC62619, IEC62133, UN38.3 cùng ISO 9001:2015 và ISO "
-                "14001:2015. Riêng UN38.3 là điều kiện bắt buộc cho vận chuyển pin "
-                "lithium bằng đường hàng không và đường biển — thiếu chứng nhận này, lô "
-                "hàng không thể lên tàu hay lên máy bay.",
-            ),
-            (
-                "Tính nhất quán giữa các lô sản xuất",
-                "Rủi ro lớn nhất khi gia công số lượng lớn là chất lượng dao động giữa "
-                "các lô. Nhà máy Hoa Huy áp dụng dây chuyền hàn laser công suất cao và "
-                "quy trình phân loại cell trước khi lắp ráp, để các cell trong cùng khối "
-                "pin có thông số đồng đều. Kết hợp với hệ thống quản lý chất lượng ISO "
-                "9001:2015, đây là cơ sở để giữ ổn định thông số đầu ra qua nhiều đợt "
-                "sản xuất khác nhau.",
-            ),
-            (
-                "Năng lực nhà máy có thể kiểm chứng",
-                "Nhà máy đặt tại Lô CN03, KCN Thái Hà, xã Bắc Lý, tỉnh Ninh Bình với hơn "
-                "200 nhân sự, trong đó 100% kỹ thuật viên được đào tạo về an toàn hóa "
-                "chất, an toàn điện và vận hành pin lithium. Đối tác OEM/ODM có thể sắp "
-                "xếp tham quan nhà máy và làm việc trực tiếp với đội kỹ thuật — cách "
-                "kiểm chứng năng lực đáng tin cậy hơn nhiều so với tài liệu giới thiệu.",
-            ),
-            (
-                "Dịch vụ hiệu chuẩn và kiểm tra chất lượng",
-                "Ngoài gia công, Hoa Huy cung cấp dịch vụ hiệu chuẩn và kiểm tra chất "
-                "lượng pin. Với doanh nghiệp cần đánh giá độc lập hiệu năng của lô pin "
-                "trước khi đưa vào sản phẩm cuối, đây là bước kiểm soát giúp phát hiện "
-                "sai lệch sớm, thay vì để lỗi đi tới tay người dùng cuối và phát sinh "
-                "chi phí bảo hành lớn hơn nhiều lần.",
-            ),
+            ("Vấn đề mà pin lưu trữ giải quyết",
+             "Hệ điện mặt trời phát mạnh nhất vào giữa trưa, trong khi nhiều gia đình "
+             "tiêu thụ nhiều nhất vào buổi tối khi cả nhà về. Không có pin, phần điện dư "
+             "ban ngày sẽ phát lên lưới, còn buổi tối vẫn phải mua điện. Pin lưu trữ giữ "
+             "lại phần dư đó để dùng vào khung giờ cần thiết, qua đó nâng tỷ lệ tự tiêu "
+             "thụ của cả hệ thống."),
+            ("Tính dung lượng theo nhu cầu thật",
+             "Cách làm đúng là liệt kê các thiết bị cần chạy, công suất từng thiết bị và "
+             "số giờ dự kiến sử dụng, từ đó suy ra lượng điện cần lưu trữ. Nên tính riêng "
+             "cho hai kịch bản: dùng hằng ngày để dịch điện sang buổi tối, và dùng dự "
+             "phòng khi mất điện. Hai kịch bản này cho ra con số khác nhau, và việc chọn "
+             "kịch bản nào là quyết định của chủ nhà chứ không phải của người bán."),
+            ("Vì sao LiFePO4 phổ biến cho hệ dân dụng",
+             "Trong các loại pin lithium, LiFePO4 được ưa dùng cho hệ lưu trữ tại nhà "
+             "nhờ độ ổn định nhiệt tốt và tuổi thọ chu kỳ cao. Với thiết bị đặt trong "
+             "hoặc sát khu vực sinh hoạt, độ an toàn là tiêu chí được đặt lên trước hiệu "
+             "năng. Đây cũng là lý do loại pin này dần thay thế các giải pháp ắc quy "
+             "truyền thống trong hệ điện mặt trời gia đình."),
+            ("Tuổi thọ tính theo chu kỳ, không theo năm",
+             "Pin lưu trữ thường được công bố tuổi thọ theo số chu kỳ sạc/xả kèm mức "
+             "dung lượng còn lại, chứ không đơn thuần theo số năm. Điều đó có nghĩa cách "
+             "sử dụng ảnh hưởng trực tiếp đến độ bền: pin xả cạn hằng ngày sẽ hao mòn "
+             "nhanh hơn pin chỉ dùng ở mức vừa phải. Khi so sánh sản phẩm, nên đối chiếu "
+             "cả số chu kỳ và điều kiện kèm theo trong cam kết bảo hành."),
+            ("Tương thích với hệ thống hiện có",
+             "Nếu bổ sung pin cho hệ đã lắp sẵn, cần kiểm tra inverter hiện tại có hỗ trợ "
+             "kết nối pin hay không. Nhiều hệ hòa lưới thông thường không có sẵn khả năng "
+             "này và sẽ phải thay inverter — khoản phát sinh không nhỏ. Đây là lý do nên "
+             "bàn về kế hoạch lắp pin ngay từ khi thiết kế hệ thống ban đầu, kể cả khi "
+             "chưa lắp ngay."),
         ],
-        "hashtags": ["#OEM", "#ODM", "#SanXuatPin", "#MadeInVietnam"],
+        "closings": [
+            "Tóm lại, pin lưu trữ điện mặt trời đáng đầu tư khi anh/chị cần dự phòng lúc "
+            "mất điện hoặc muốn nâng tỷ lệ tự tiêu thụ. Dung lượng kWh nên tính từ nhóm "
+            "thiết bị ưu tiên, và LiFePO4 là lựa chọn phổ biến cho hệ dân dụng nhờ độ an "
+            "toàn cùng tuổi thọ pin tốt.",
+            "Nói ngắn gọn, trước khi chốt pin lưu trữ điện mặt trời, hãy trả lời hai câu: "
+            "cần chạy những thiết bị nào và trong bao lâu. Từ đó mới ra được dung lượng "
+            "kWh hợp lý, thay vì chọn theo gói có sẵn.",
+        ],
+        "hashtags": ["#PinLuuTru", "#LuuTruDienMatTroi", "#LiFePO4", "#SolarBattery"],
     },
     {
-        "id": "an-toan-pin-lithium",
-        "focus_keyword": "an toàn pin lithium",
-        "secondary_keywords": [
-            "cell LiFePO4",
-            "hệ thống BMS",
-            "chứng nhận UL",
-            "quá nhiệt",
-        ],
-        "closings": [
-            "Tóm lại, an toàn pin lithium là kết quả của ba lớp cộng lại: hóa học cell "
-            "LiFePO4, chất lượng chế tạo, và hệ thống BMS ngắt bảo vệ khi quá nhiệt hay "
-            "quá dòng — cùng bộ chứng nhận UL, IEC làm cơ sở kiểm chứng khách quan.",
-            "Nói ngắn gọn, an toàn pin lithium hoàn toàn có thể kiểm soát được: chọn cell "
-            "LiFePO4 ổn định nhiệt, yêu cầu chứng nhận UL và IEC cho đúng dòng sản phẩm "
-            "mình mua, và đảm bảo hệ thống BMS đủ năng lực ngắt bảo vệ khi quá nhiệt.",
-        ],
-        "image_query": "battery safety testing laboratory",
-        "image_alt": "Kiểm tra an toàn pin lithium LiFePO4 theo tiêu chuẩn UL và IEC tại Hoa Huy",
+        "id": "bai-toan-hoan-von",
+        "focus_keyword": "chi phí lắp điện mặt trời",
+        "secondary_keywords": ["hoàn vốn", "hóa đơn tiền điện", "tự tiêu thụ", "báo giá"],
+        "image_query": "solar panels installation house calculation",
+        "image_alt": "Tính toán chi phí đầu tư và hiệu quả hệ thống điện mặt trời",
         "hooks": [
-            "An toàn pin lithium: rủi ro đến từ đâu và kiểm soát bằng cách nào?",
-            "An toàn pin lithium không phải chuyện may rủi — đó là chuyện tiêu chuẩn.",
-            "An toàn pin lithium cho đội xe điện: ba lớp bảo vệ cần có.",
+            "Chi phí lắp điện mặt trời: vì sao các báo giá chênh nhau nhiều đến vậy?",
+            "Chi phí lắp điện mặt trời và bài toán hoàn vốn — tính thế nào cho đúng?",
+            "Chi phí lắp điện mặt trời: đọc báo giá theo hạng mục, đừng nhìn tổng tiền.",
         ],
         "intros": [
-            "An toàn pin lithium là mối quan tâm hàng đầu của mọi doanh nghiệp vận hành "
-            "đội xe điện hay hệ lưu trữ, bởi một sự cố không chỉ gây thiệt hại tài sản "
-            "mà còn ảnh hưởng trực tiếp đến an toàn lao động và uy tín thương hiệu. Tin "
-            "tốt là phần lớn rủi ro có thể kiểm soát được nếu hiểu đúng nguồn gốc và "
-            "chọn đúng loại sản phẩm ngay từ đầu.",
-            "Những thông tin về sự cố pin xe điện khiến nhiều doanh nghiệp e ngại khi "
-            "chuyển đổi. Tuy nhiên, an toàn pin lithium phụ thuộc rất lớn vào hóa học "
-            "cell, chất lượng chế tạo và hệ thống bảo vệ đi kèm — những yếu tố hoàn "
-            "toàn có thể kiểm chứng qua chứng nhận và hồ sơ kỹ thuật trước khi mua.",
+            "Khi nhận vài báo giá cho cùng một công suất, nhiều chủ nhà bối rối vì mức "
+            "chênh lệch khá lớn. Chi phí lắp điện mặt trời không chỉ gồm tấm pin và "
+            "inverter, mà còn nhiều hạng mục ít được nhắc tới nhưng ảnh hưởng trực tiếp "
+            "đến độ bền hệ thống. Bài viết này giúp anh/chị đọc báo giá có cơ sở hơn.",
+            "Thời gian hoàn vốn của điện mặt trời phụ thuộc vào quá nhiều biến số để có "
+            "một con số chung cho mọi công trình. Thay vì tin vào một mốc thời gian được "
+            "đưa ra sẵn, anh/chị nên nắm cách tính để tự kiểm chứng dựa trên chi phí lắp "
+            "điện mặt trời và mức tiêu thụ thật của gia đình mình.",
         ],
         "sections": [
-            (
-                "Lớp thứ nhất: hóa học cell",
-                "Không phải pin lithium nào cũng giống nhau. LiFePO4 (lithium sắt phốt "
-                "phát) được đánh giá cao về độ ổn định nhiệt so với nhiều dòng lithium "
-                "phổ thông khác — đây là lý do toàn bộ sản phẩm Hoa Huy đều dùng cell "
-                "LiFePO4, từ pin xe máy điện, xe golf, xe nâng cho đến hệ lưu trữ ESS. "
-                "Chọn đúng hóa học cell là lớp bảo vệ đầu tiên và cũng là lớp khó thay "
-                "đổi nhất sau khi sản phẩm đã hoàn thiện.",
-            ),
-            (
-                "Lớp thứ hai: chất lượng chế tạo",
-                "Phần lớn sự cố pin không đến từ bản thân cell mà từ mối hàn kém, cell "
-                "không đồng đều hoặc kết cấu khối pin không chịu được rung xóc. Nhà máy "
-                "Hoa Huy dùng dây chuyền hàn laser công suất cao và phân loại cell trước "
-                "khi lắp ráp, để các cell trong cùng khối pin có thông số tương đồng. "
-                "Cell lệch thông số sẽ chịu tải không đều khi sạc và xả, dẫn đến suy "
-                "giảm nhanh và phát nhiệt cục bộ.",
-            ),
-            (
-                "Lớp thứ ba: hệ thống quản lý pin BMS",
-                "BMS là bộ não giám sát toàn bộ khối pin trong suốt quá trình vận hành. "
-                "Nó theo dõi điện áp từng nhánh cell, dòng sạc/xả và nhiệt độ, ngắt bảo "
-                "vệ khi thông số vượt ngưỡng an toàn. Với các dự án OEM/ODM, Hoa Huy "
-                "tham gia thiết kế BMS theo đặc thù thiết bị, vì ngưỡng bảo vệ phù hợp "
-                "cho xe máy điện chạy đường phố khác với xe nâng vận hành liên tục trong "
-                "nhà xưởng.",
-            ),
-            (
-                "Chứng nhận — cách kiểm chứng khách quan",
-                "Bộ chứng nhận UL1642, UL1973, IEC62619, IEC62133 và UN38.3 là kết quả "
-                "của các bài thử nghiệm độc lập về an toàn pin lithium. Với chủ đầu tư "
-                "hoặc bên mua, đây là cách xác minh chất lượng khách quan thay vì chỉ "
-                "dựa vào cam kết của nhà cung cấp. Khi thẩm định nhà cung cấp, nên yêu "
-                "cầu bản chứng nhận cụ thể cho dòng sản phẩm mình mua, không chỉ chứng "
-                "nhận chung của doanh nghiệp.",
-            ),
-            (
-                "Vận hành đúng cách kéo dài tuổi thọ",
-                "Ngay cả với pin đạt chuẩn, cách sử dụng vẫn ảnh hưởng lớn đến độ bền và "
-                "an toàn. Nên dùng bộ sạc đúng thông số do nhà sản xuất chỉ định, tránh "
-                "để pin phơi nắng gắt kéo dài, và kiểm tra định kỳ tình trạng đầu nối, "
-                "dây dẫn. Với đội xe nhiều đầu phương tiện, việc đào tạo người vận hành "
-                "về quy trình sạc chuẩn thường mang lại hiệu quả cao hơn nhiều so với "
-                "chi phí bỏ ra.",
-            ),
+            ("Các hạng mục tạo nên báo giá",
+             "Một báo giá đầy đủ gồm: tấm pin, inverter, khung giá đỡ, dây dẫn DC và AC, "
+             "tủ điện cùng thiết bị bảo vệ, hệ thống tiếp địa và chống sét, nhân công thi "
+             "công, và phần hoàn thiện chống thấm. Khi hai báo giá chênh nhau, nguyên "
+             "nhân thường nằm ở nhóm hạng mục phía sau chứ không phải ở tấm pin. Nên yêu "
+             "cầu bóc tách chi tiết để so sánh đúng thứ cần so sánh."),
+            ("Cách tính hoàn vốn cho đúng",
+             "Công thức cơ bản là lấy tổng chi phí đầu tư chia cho khoản tiết kiệm mỗi "
+             "năm. Phần khó nằm ở vế thứ hai: khoản tiết kiệm phụ thuộc vào sản lượng "
+             "thực tế của hệ, tỷ lệ tự tiêu thụ và đơn giá điện đang áp dụng. Vì cả ba "
+             "yếu tố này khác nhau theo từng công trình, con số hoàn vốn chỉ đáng tin khi "
+             "được tính từ dữ liệu thật của chính gia đình anh/chị."),
+            ("Tỷ lệ tự tiêu thụ ảnh hưởng lớn nhất",
+             "Cùng một hệ thống, gia đình dùng nhiều điện ban ngày sẽ có hiệu quả kinh tế "
+             "tốt hơn hẳn gia đình chỉ sinh hoạt buổi tối, vì điện tự sản xuất được dùng "
+             "trực tiếp thay vì phát lên lưới. Đây là lý do việc khảo sát thói quen dùng "
+             "điện quan trọng ngang với khảo sát mái, và cũng là lý do không nên áp một "
+             "tỷ lệ hoàn vốn chung cho mọi khách hàng."),
+            ("Biểu giá điện bậc thang",
+             "Với hộ gia đình áp dụng biểu giá bậc thang, phần điện tiêu thụ ở bậc cao có "
+             "đơn giá cao hơn nhiều so với bậc thấp. Điện mặt trời cắt vào phần tiêu thụ "
+             "ở bậc trên cùng trước, nên gia đình đang dùng nhiều điện thường thấy hiệu "
+             "quả rõ rệt hơn. Đây cũng là lý do hóa đơn tiền điện hiện tại là dữ liệu đầu "
+             "vào quan trọng khi tính toán phương án."),
+            ("Chi phí trong vòng đời hệ thống",
+             "Ngoài đầu tư ban đầu, nên tính thêm chi phí vận hành: vệ sinh tấm pin định "
+             "kỳ, kiểm tra hệ thống, và khả năng phải thay inverter ở giữa vòng đời do "
+             "thiết bị này có tuổi thọ ngắn hơn tấm pin. Đưa các khoản đó vào ngay từ đầu "
+             "sẽ cho bức tranh sát thực tế hơn, thay vì chỉ so sánh giá lắp đặt ban đầu "
+             "giữa các nhà cung cấp."),
         ],
-        "hashtags": ["#AnToanPin", "#BMS", "#TieuChuanUL", "#PinAnToan"],
+        "closings": [
+            "Tóm lại, để đánh giá chi phí lắp điện mặt trời, hãy yêu cầu báo giá bóc tách "
+            "theo hạng mục và tự tính hoàn vốn dựa trên hóa đơn tiền điện cùng tỷ lệ tự "
+            "tiêu thụ của chính gia đình mình, thay vì dựa vào con số chung.",
+            "Nói ngắn gọn, chi phí lắp điện mặt trời chỉ có ý nghĩa khi đặt cạnh sản lượng "
+            "và mức tự tiêu thụ thực tế. Một báo giá rẻ hơn nhưng cắt bớt hạng mục bảo vệ "
+            "và chống thấm thường đắt hơn về lâu dài — hãy so sánh trên hóa đơn tiền điện "
+            "tiết kiệm được, không chỉ trên tổng tiền đầu tư.",
+        ],
+        "hashtags": ["#ChiPhiDienMatTroi", "#HoanVon", "#BaoGiaSolar", "#DauTuSolar"],
     },
     {
-        "id": "sac-du-phong-tram-sac",
-        "focus_keyword": "sạc dự phòng LiFePO4",
-        "secondary_keywords": [
-            "trạm sạc dự phòng",
-            "cell LiFePO4",
-            "dung lượng mAh",
-            "chứng nhận UN38.3",
-        ],
-        "closings": [
-            "Tóm lại, với sạc dự phòng LiFePO4 và trạm sạc dự phòng, điều đáng hỏi trước "
-            "tiên là loại cell LiFePO4 bên trong chứ không phải con số dung lượng mAh in "
-            "trên vỏ hộp — cùng với chứng nhận UN38.3 nếu sản phẩm cần vận chuyển quốc tế.",
-            "Nói ngắn gọn, chọn sạc dự phòng LiFePO4 hay trạm sạc dự phòng nên bắt đầu từ "
-            "hóa học cell LiFePO4 và nhu cầu sử dụng thật, rồi mới đến dung lượng mAh. "
-            "Chứng nhận UN38.3 là điều kiện bắt buộc nếu hàng đi đường hàng không.",
-        ],
-        "image_query": "portable power station outdoor",
-        "image_alt": "Sạc dự phòng và trạm sạc LiFePO4 Hoa Huy cho nhu cầu di động",
+        "id": "khao-sat-thiet-ke",
+        "focus_keyword": "khảo sát thiết kế hệ thống điện mặt trời",
+        "secondary_keywords": ["hướng mái", "bóng che", "kết cấu mái", "tải tiêu thụ"],
+        "image_query": "engineer surveying roof solar installation",
+        "image_alt": "Kỹ thuật viên khảo sát mái trước khi thiết kế hệ thống điện mặt trời",
         "hooks": [
-            "Sạc dự phòng LiFePO4: an toàn hơn cho thiết bị mang theo người mỗi ngày.",
-            "Sạc dự phòng LiFePO4 và trạm sạc di động — chọn theo nhu cầu thực tế.",
-            "Sạc dự phòng LiFePO4: vì sao hóa học cell lại quan trọng với thiết bị cầm tay?",
+            "Khảo sát thiết kế hệ thống điện mặt trời: bước quyết định nhưng hay bị làm qua loa.",
+            "Khảo sát thiết kế hệ thống điện mặt trời — báo giá qua điện thoại có đáng tin?",
+            "Khảo sát thiết kế hệ thống điện mặt trời: cần đo và ghi nhận những gì?",
         ],
         "intros": [
-            "Sạc dự phòng là thiết bị được mang theo người, để trong túi xách, trong "
-            "cabin xe hoặc trên bàn làm việc suốt ngày. Chính vì luôn ở gần người dùng, "
-            "yếu tố an toàn của sạc dự phòng LiFePO4 đáng được cân nhắc kỹ hơn nhiều so "
-            "với một thiết bị đặt cố định. Hóa học cell là điểm khác biệt căn bản mà "
-            "thông số dung lượng trên vỏ hộp không nói ra.",
-            "Giữa hàng loạt sản phẩm sạc dự phòng trên thị trường, tiêu chí phân biệt rõ "
-            "nhất không phải con số mAh mà là loại cell bên trong. Sạc dự phòng LiFePO4 "
-            "hướng đến nhóm người dùng và doanh nghiệp coi trọng độ an toàn và độ bền "
-            "hơn là mức giá thấp nhất có thể.",
+            "Một báo giá đưa ra chỉ sau vài câu hỏi qua điện thoại thường là dấu hiệu "
+            "đáng lưu ý. Khảo sát thiết kế hệ thống điện mặt trời là bước quyết định "
+            "công suất, cách bố trí và cả độ bền của công trình. Bỏ qua bước này đồng "
+            "nghĩa với việc chấp nhận rủi ro lắp sai ngay từ đầu.",
+            "Cùng một mái nhà, hai đơn vị khảo sát kỹ và khảo sát qua loa sẽ cho ra hai "
+            "phương án rất khác nhau. Bài viết này liệt kê những gì một buổi khảo sát "
+            "thiết kế hệ thống điện mặt trời cần ghi nhận, để anh/chị biết mình đang được "
+            "tư vấn nghiêm túc hay chỉ được chào bán một gói có sẵn.",
         ],
         "sections": [
-            (
-                "Dải dung lượng cho từng nhu cầu",
-                "Hoa Huy có sạc dự phòng LiFePO4 ở các mức 5.000, 10.000, 15.000, 20.000 "
-                "và 30.000 mAh. Mức 10.000 mAh phù hợp nhu cầu hàng ngày với đặc điểm "
-                "điện áp phẳng và độ an toàn cao. Mức 15.000 mAh cân bằng giữa dung "
-                "lượng và độ gọn. Các mức 20.000 và 30.000 mAh hướng đến người dùng di "
-                "chuyển nhiều, cần sạc nhiều thiết bị hoặc làm việc dài ngày ngoài văn "
-                "phòng.",
-            ),
-            (
-                "Trạm sạc cho công việc hiện trường",
-                "Với đội kỹ thuật làm việc ngoài hiện trường hoặc nhu cầu dã ngoại, dòng "
-                "trạm sạc dự phòng LiFePO4 có hai mức: 286Wh cho nhu cầu nhỏ gọn và "
-                "768Wh cho các buổi làm việc dài hơn. Khác với sạc dự phòng cầm tay, "
-                "trạm sạc hướng tới việc cấp nguồn cho nhiều thiết bị cùng lúc trong "
-                "điều kiện không có nguồn điện lưới sẵn có.",
-            ),
-            (
-                "Vì sao chọn LiFePO4 cho thiết bị cầm tay",
-                "Với sản phẩm thường xuyên tiếp xúc gần người dùng, độ ổn định nhiệt của "
-                "cell là ưu tiên hàng đầu. LiFePO4 được đánh giá cao ở đặc tính này so "
-                "với nhiều dòng lithium phổ thông khác, đồng thời cho điện áp ổn định "
-                "hơn trong quá trình xả — thiết bị được cấp nguồn đều thay vì yếu dần về "
-                "cuối. Đây là lý do Hoa Huy chọn LiFePO4 cho toàn bộ dòng thiết bị di "
-                "động của mình.",
-            ),
-            (
-                "Hướng OEM cho doanh nghiệp",
-                "Nhóm sản phẩm thiết bị di động đặc biệt phù hợp với các thương hiệu "
-                "muốn phát triển dòng sạc dự phòng riêng hoặc doanh nghiệp cần quà tặng "
-                "đối tác có gắn nhận diện. Hoa Huy nhận gia công OEM/ODM cho nhóm này, "
-                "từ dung lượng, kiểu dáng đến nhận diện thương hiệu in trên sản phẩm, "
-                "trên nền tảng cùng bộ tiêu chuẩn chất lượng áp dụng cho các dòng pin "
-                "công nghiệp.",
-            ),
-            (
-                "Lưu ý khi vận chuyển và bảo quản",
-                "Pin lithium thuộc nhóm hàng có quy định riêng khi vận chuyển bằng đường "
-                "hàng không và đường biển, với UN38.3 là chứng nhận bắt buộc. Sản phẩm "
-                "Hoa Huy đáp ứng tiêu chuẩn này, thuận lợi cho doanh nghiệp có nhu cầu "
-                "xuất khẩu hoặc phân phối quốc tế. Về bảo quản, nên để nơi khô ráo, "
-                "tránh nhiệt độ cao kéo dài và không lưu kho ở trạng thái cạn kiệt hoàn "
-                "toàn trong thời gian dài.",
-            ),
+            ("Đo đạc mái và xác định diện tích khả dụng",
+             "Không phải toàn bộ diện tích mái đều lắp được. Cần trừ đi khu vực có vật "
+             "cản như bồn nước, ống thông gió, cửa mái, cùng khoảng cách an toàn ở rìa "
+             "mái và lối đi phục vụ bảo trì sau này. Diện tích khả dụng thực tế thường "
+             "nhỏ hơn diện tích mái khá nhiều, và đây là con số quyết định công suất tối "
+             "đa có thể lắp."),
+            ("Hướng mái và độ dốc",
+             "Hướng và độ dốc quyết định lượng bức xạ mà dàn pin nhận được trong ngày. "
+             "Ở Việt Nam, mái hướng nam thường cho sản lượng tốt nhất, nhưng mái hướng "
+             "đông hoặc tây vẫn khai thác được. Với mái nhiều hướng khác nhau, cách chia "
+             "chuỗi và lựa chọn thiết bị cần được tính riêng cho từng mặt mái, thay vì áp "
+             "chung một cấu hình cho toàn bộ hệ thống."),
+            ("Ghi nhận bóng che theo giờ",
+             "Bóng che là yếu tố dễ bị bỏ qua nhất vì nó thay đổi theo giờ và theo mùa. "
+             "Một tán cây không che gì lúc 10 giờ sáng có thể phủ nửa mái vào buổi chiều. "
+             "Khảo sát nghiêm túc cần ghi nhận nguồn bóng che và khoảng thời gian ảnh "
+             "hưởng, từ đó quyết định cách chia chuỗi hoặc có cần thiết bị tối ưu theo "
+             "từng tấm hay không."),
+            ("Đánh giá kết cấu chịu lực",
+             "Hệ thống làm tăng tải trọng thường xuyên lên mái, đồng thời chịu thêm tải "
+             "gió. Cần đánh giá tình trạng kèo, xà gồ và vật liệu lợp hiện tại. Nếu mái "
+             "đã xuống cấp hoặc dự kiến thay trong vài năm tới, nên xử lý trước khi lắp "
+             "— vì việc tháo dỡ và lắp lại toàn bộ hệ thống về sau tốn kém hơn nhiều so "
+             "với làm gọn ngay từ đầu."),
+            ("Phân tích tải tiêu thụ",
+             "Song song với khảo sát mái là phân tích tải tiêu thụ: hóa đơn điện các "
+             "tháng gần nhất, các thiết bị công suất lớn và khung giờ hoạt động. Dữ liệu "
+             "này quyết định công suất hợp lý và tỷ lệ tự tiêu thụ dự kiến. Thiếu bước "
+             "này, phương án đưa ra chỉ dựa trên diện tích mái, dễ dẫn đến lắp thừa so "
+             "với nhu cầu thật của gia đình."),
         ],
-        "hashtags": ["#SacDuPhong", "#TramSac", "#ThietBiDiDong", "#PinAnToan"],
+        "closings": [
+            "Tóm lại, một buổi khảo sát thiết kế hệ thống điện mặt trời nghiêm túc phải "
+            "ghi nhận đủ bốn thứ: diện tích khả dụng, hướng mái và độ dốc, bóng che theo "
+            "giờ, và kết cấu mái — cộng với phân tích tải tiêu thụ từ hóa đơn thật.",
+            "Nói ngắn gọn, nếu một đơn vị báo giá mà chưa từng lên mái đo đạc, chưa hỏi "
+            "về bóng che và chưa xem hóa đơn điện, thì đó chưa phải là khảo sát thiết kế "
+            "hệ thống điện mặt trời — mới chỉ là chào bán một gói thiết bị.",
+        ],
+        "hashtags": ["#KhaoSatSolar", "#ThietKeHeThong", "#DienMatTroi", "#TuVanSolar"],
     },
     {
-        "id": "battery-swapping",
-        "focus_keyword": "trạm đổi pin xe điện",
-        "secondary_keywords": [
-            "hoán đổi pin",
-            "cho thuê pin",
-            "đội xe điện",
-            "thời gian sạc",
-        ],
-        "closings": [
-            "Tóm lại, mô hình trạm đổi pin xe điện phù hợp nhất với đội xe điện khai thác "
-            "cường độ cao, nơi thời gian sạc ăn trực tiếp vào doanh thu. Kết hợp với dịch "
-            "vụ cho thuê pin và hoán đổi pin, doanh nghiệp giảm được cả vốn đầu tư ban "
-            "đầu lẫn thời gian phương tiện nằm chờ.",
-            "Nói ngắn gọn, trạm đổi pin xe điện đưa thời gian sạc ra khỏi giờ khai thác "
-            "của đội xe điện. Với doanh nghiệp còn cân nhắc vốn, dịch vụ cho thuê pin và "
-            "hoán đổi pin cho phép thử mô hình ở quy mô nhỏ trước khi mở rộng.",
-        ],
-        "image_query": "battery swapping station electric vehicle",
-        "image_alt": "Giải pháp trạm đổi pin xe điện và cho thuê pin lưu trữ của Hoa Huy Green Energy",
+        "id": "thi-cong-an-toan",
+        "focus_keyword": "thi công lắp đặt điện mặt trời",
+        "secondary_keywords": ["chống thấm mái", "chống sét", "an toàn điện", "khung giá đỡ"],
+        "image_query": "solar panel installation workers roof",
+        "image_alt": "Thi công lắp đặt hệ thống điện mặt trời trên mái công trình",
         "hooks": [
-            "Trạm đổi pin xe điện: bỏ hẳn thời gian chờ sạc ra khỏi bài toán vận hành.",
-            "Trạm đổi pin xe điện và cho thuê pin — hai cách giảm vốn đầu tư ban đầu.",
-            "Trạm đổi pin xe điện: mô hình phù hợp với đội xe nào?",
+            "Thi công lắp đặt điện mặt trời: phần quyết định hệ bền 20 năm hay dột sau một mùa mưa.",
+            "Thi công lắp đặt điện mặt trời — những chi tiết không có trên báo giá.",
+            "Thi công lắp đặt điện mặt trời: hỏi gì để biết đơn vị làm có kỹ không?",
         ],
         "intros": [
-            "Với đội xe giao hàng hoặc xe dịch vụ chạy liên tục, thời gian sạc là thời "
-            "gian không tạo ra doanh thu. Mô hình trạm đổi pin xe điện giải quyết đúng "
-            "điểm nghẽn đó: thay vì chờ sạc đầy, phương tiện đổi lấy một khối pin đã sạc "
-            "sẵn và tiếp tục hành trình. Cách tiếp cận này thay đổi cả cấu trúc chi phí "
-            "lẫn cách tổ chức vận hành.",
-            "Không phải doanh nghiệp nào cũng muốn bỏ vốn mua toàn bộ pin cho đội xe "
-            "ngay từ đầu, nhất là khi nhu cầu còn biến động. Mô hình trạm đổi pin xe "
-            "điện và dịch vụ cho thuê pin cho phép chuyển một khoản đầu tư tài sản thành "
-            "chi phí vận hành theo kỳ, dễ kiểm soát dòng tiền hơn.",
+            "Thiết bị tốt nhưng thi công ẩu vẫn cho ra một hệ thống có vấn đề. Với điện "
+            "mặt trời, phần lớn sự cố phát sinh sau vài năm đều bắt nguồn từ khâu thi "
+            "công lắp đặt điện mặt trời: điểm bắt vít không được xử lý chống thấm, đầu "
+            "nối không siết đúng, hoặc hệ tiếp địa làm cho có.",
+            "Khác với nhiều hạng mục xây dựng, chất lượng thi công lắp đặt điện mặt trời "
+            "không thể hiện ngay lúc nghiệm thu. Hệ vẫn chạy, sản lượng vẫn lên, và vấn "
+            "đề chỉ lộ ra sau vài mùa mưa nắng. Đây là lý do nên biết trước những chi "
+            "tiết cần kiểm tra.",
         ],
         "sections": [
-            (
-                "Đổi pin thay vì chờ sạc",
-                "Điểm mấu chốt của mô hình là tách thời gian sạc ra khỏi thời gian khai "
-                "thác phương tiện. Khối pin cạn được thu về trạm để sạc theo lịch, trong "
-                "khi xe nhận khối pin đã đầy và tiếp tục vận hành ngay. Với đội xe giao "
-                "hàng chạy nhiều ca hoặc phương tiện dịch vụ có khung giờ cao điểm rõ "
-                "rệt, phần thời gian tiết kiệm được cộng dồn trên toàn đội là con số "
-                "đáng kể.",
-            ),
-            (
-                "Chuyển đầu tư tài sản thành chi phí vận hành",
-                "Pin thường chiếm tỷ trọng lớn trong giá trị một chiếc xe điện. Dịch vụ "
-                "cho thuê pin lưu trữ công nghiệp và giải pháp hoán đổi pin của Hoa Huy "
-                "cho phép doanh nghiệp giảm vốn đầu tư ban đầu, chuyển sang chi phí theo "
-                "kỳ. Với đơn vị đang trong giai đoạn mở rộng hoặc thử nghiệm chuyển đổi "
-                "sang xe điện, đây là cách giảm rủi ro tài chính khi quy mô đội xe chưa "
-                "ổn định.",
-            ),
-            (
-                "Quản lý vòng đời pin tập trung",
-                "Khi pin được quản lý tập trung tại trạm, quy trình sạc diễn ra trong "
-                "điều kiện kiểm soát được thay vì phụ thuộc vào thói quen của từng người "
-                "vận hành. Điều này giúp giảm các sai sót phổ biến như dùng sai bộ sạc "
-                "hoặc để pin ở trạng thái cạn kiệt kéo dài — những yếu tố ảnh hưởng trực "
-                "tiếp đến tuổi thọ thực tế của khối pin.",
-            ),
-            (
-                "Yêu cầu về tính đồng nhất của khối pin",
-                "Mô hình đổi pin chỉ vận hành trơn tru khi các khối pin trong hệ thống "
-                "đồng nhất về thông số, đầu nối và giao thức BMS. Đây là lý do năng lực "
-                "OEM/ODM và tính nhất quán giữa các lô sản xuất trở nên quan trọng — nhà "
-                "máy Hoa Huy áp dụng phân loại cell trước lắp ráp và hệ thống ISO "
-                "9001:2015 để giữ ổn định thông số đầu ra qua nhiều đợt sản xuất.",
-            ),
-            (
-                "Bắt đầu từ quy mô nhỏ",
-                "Với doanh nghiệp muốn thử mô hình trước khi cam kết dài hạn, phương án "
-                "hợp lý là triển khai trên một nhánh tuyến hoặc một nhóm xe có tần suất "
-                "khai thác cao nhất. Số liệu vận hành thu được từ giai đoạn này là cơ sở "
-                "để tính toán quy mô trạm và số lượng pin luân chuyển cần thiết khi mở "
-                "rộng ra toàn đội.",
-            ),
+            ("Chống thấm tại điểm bắt giá đỡ",
+             "Mỗi điểm cố định khung giá đỡ vào mái là một điểm có nguy cơ thấm nước. "
+             "Với mái tôn, việc chọn đúng loại vít kèm gioăng và xử lý keo chuyên dụng là "
+             "bắt buộc. Với mái ngói hoặc mái bê tông, cách xử lý khác nhau và cần đúng "
+             "quy trình. Đây là hạng mục hầu như không xuất hiện trong báo giá nhưng lại "
+             "là nguyên nhân khiếu nại phổ biến nhất sau khi lắp."),
+            ("Khung giá đỡ và tải gió",
+             "Khung giá đỡ phải chịu được cả trọng lượng dàn pin lẫn tải gió, vốn có thể "
+             "rất lớn ở khu vực trống trải hoặc nhà cao tầng. Vật liệu cần chống ăn mòn "
+             "để trụ được ngoài trời hàng chục năm. Khoảng hở giữa tấm pin và mặt mái "
+             "cũng cần đủ để thông gió, vì nhiệt độ cao làm giảm hiệu suất phát điện của "
+             "tấm pin."),
+            ("Đi dây và bảo vệ mạch điện",
+             "Dây dẫn phần một chiều phải dùng loại chuyên dụng chịu được tia cực tím và "
+             "nhiệt độ ngoài trời, được cố định gọn gàng thay vì thả tự do trên mái. Hệ "
+             "thống cần có thiết bị đóng cắt và bảo vệ ở cả phía một chiều lẫn xoay "
+             "chiều, đặt ở vị trí thao tác được khi cần cô lập hệ thống để sửa chữa hoặc "
+             "xử lý sự cố."),
+            ("Tiếp địa và chống sét",
+             "Dàn pin đặt ở vị trí cao và trống trải nên hệ tiếp địa cùng thiết bị chống "
+             "sét lan truyền là hạng mục bắt buộc, không phải tùy chọn. Đây cũng là chỗ "
+             "dễ bị cắt giảm để hạ giá báo giá. Khi so sánh các phương án, nên hỏi rõ "
+             "hạng mục này được làm thế nào, vì nó bảo vệ cả hệ thống lẫn thiết bị điện "
+             "trong nhà."),
+            ("Nghiệm thu và bàn giao hồ sơ",
+             "Kết thúc thi công, nên yêu cầu bàn giao hồ sơ gồm sơ đồ đấu nối, danh mục "
+             "thiết bị kèm số seri, phiếu bảo hành của từng hạng mục và hướng dẫn vận "
+             "hành cơ bản. Bộ hồ sơ này rất cần khi bảo hành hoặc khi cần đơn vị khác "
+             "kiểm tra hệ thống về sau. Thiếu nó, việc xử lý sự cố sẽ mất nhiều thời gian "
+             "hơn đáng kể."),
         ],
-        "hashtags": ["#BatterySwapping", "#DoiPin", "#XeDien", "#ChoThuePin"],
+        "closings": [
+            "Tóm lại, chất lượng thi công lắp đặt điện mặt trời nằm ở những chi tiết ít "
+            "được nhắc: xử lý chống thấm mái tại điểm bắt giá đỡ, khung giá đỡ chịu được "
+            "tải gió, hệ chống sét và tiếp địa đầy đủ, cùng an toàn điện ở cả hai phía "
+            "một chiều và xoay chiều.",
+            "Nói ngắn gọn, khi chọn đơn vị thi công lắp đặt điện mặt trời, hãy hỏi cụ thể "
+            "về cách xử lý chống thấm mái, vật liệu khung giá đỡ và phương án chống sét. "
+            "Câu trả lời cho ba câu hỏi đó nói lên nhiều điều hơn cả bảng báo giá.",
+        ],
+        "hashtags": ["#ThiCongSolar", "#LapDatDienMatTroi", "#ChongTham", "#AnToanDien"],
     },
     {
-        "id": "chuyen-doi-xe-dien-doanh-nghiep",
-        "focus_keyword": "chuyển đổi sang xe điện",
-        "secondary_keywords": [
-            "đội xe điện",
-            "tổng chi phí sở hữu",
-            "hạ tầng sạc",
-            "hoán đổi pin",
-        ],
-        "closings": [
-            "Tóm lại, chuyển đổi sang xe điện nên triển khai theo giai đoạn: chọn nhóm "
-            "phương tiện phù hợp trước, tính đủ tổng chi phí sở hữu, chuẩn bị hạ tầng "
-            "sạc, rồi cân nhắc hoán đổi pin cho nhóm đội xe điện chạy cường độ cao.",
-            "Nói ngắn gọn, chuyển đổi sang xe điện là bài toán lộ trình chứ không phải "
-            "một lần mua sắm. Tổng chi phí sở hữu, hạ tầng sạc và phương án hoán đổi pin "
-            "cần được tính cùng nhau ngay từ giai đoạn thí điểm trên một phần đội xe điện.",
-        ],
-        "image_query": "electric vehicle fleet delivery",
-        "image_alt": "Giải pháp pin lithium Hoa Huy cho doanh nghiệp chuyển đổi sang đội xe điện",
+        "id": "bao-tri-van-hanh",
+        "focus_keyword": "bảo trì hệ thống điện mặt trời",
+        "secondary_keywords": ["vệ sinh tấm pin", "kiểm tra định kỳ", "sản lượng", "inverter"],
+        "image_query": "cleaning solar panels maintenance",
+        "image_alt": "Vệ sinh và bảo trì định kỳ hệ thống điện mặt trời trên mái",
         "hooks": [
-            "Chuyển đổi sang xe điện: lộ trình cho doanh nghiệp vận tải bắt đầu từ đâu?",
-            "Chuyển đổi sang xe điện — chi phí pin chiếm bao nhiêu trong bài toán tổng?",
-            "Chuyển đổi sang xe điện theo giai đoạn: cách giảm rủi ro cho đội xe.",
+            "Bảo trì hệ thống điện mặt trời: lắp xong không có nghĩa là xong.",
+            "Bảo trì hệ thống điện mặt trời — vì sao sản lượng giảm dần mà không ai để ý?",
+            "Bảo trì hệ thống điện mặt trời: làm gì và bao lâu một lần?",
         ],
         "intros": [
-            "Xu hướng chuyển đổi sang xe điện đang tăng tốc ở các đô thị lớn, kéo theo "
-            "nhu cầu thực tế của doanh nghiệp vận tải và dịch vụ: chuyển đổi thế nào để "
-            "không gián đoạn hoạt động và không dồn quá nhiều vốn vào một thời điểm. "
-            "Pin thường là hạng mục chiếm tỷ trọng lớn nhất, nên cũng là nơi quyết định "
-            "phần lớn hiệu quả của cả lộ trình.",
-            "Chuyển đổi sang xe điện không phải là một quyết định mua sắm đơn lẻ mà là "
-            "một lộ trình nhiều giai đoạn, chạm đến hạ tầng sạc, quy trình vận hành và "
-            "cả cách tổ chức nhân sự. Bài viết này phác thảo cách tiếp cận theo giai "
-            "đoạn để doanh nghiệp kiểm soát được chi phí và rủi ro.",
+            "Điện mặt trời thường được giới thiệu là gần như không cần bảo trì. Điều đó "
+            "đúng một phần: hệ không có bộ phận chuyển động nên ít hỏng vặt. Nhưng bảo "
+            "trì hệ thống điện mặt trời vẫn cần thiết, vì sản lượng có thể giảm dần theo "
+            "cách rất khó nhận ra nếu không theo dõi.",
+            "Vấn đề lớn nhất của một hệ điện mặt trời không được theo dõi là nó vẫn chạy "
+            "khi đã có sự cố. Một chuỗi tấm pin ngừng hoạt động hay tấm pin bám bụi dày "
+            "đều không gây ra dấu hiệu gì rõ ràng — chỉ có sản lượng âm thầm giảm. Đây là "
+            "lý do bảo trì hệ thống điện mặt trời đáng được lên lịch cụ thể.",
         ],
         "sections": [
-            (
-                "Bắt đầu từ nhóm phương tiện phù hợp nhất",
-                "Không nên chuyển đổi toàn bộ đội xe cùng lúc. Cách làm ít rủi ro hơn là "
-                "chọn nhóm phương tiện có lộ trình ổn định, quãng đường hàng ngày dự "
-                "đoán được và có thể quay về điểm tập kết để sạc. Nhóm này cho số liệu "
-                "vận hành thực tế về mức tiêu thụ, thời gian sạc và chi phí, làm cơ sở "
-                "để tính toán cho các giai đoạn mở rộng tiếp theo.",
-            ),
-            (
-                "Tính đúng chi phí vòng đời, không chỉ giá mua",
-                "So sánh xe điện với xe xăng chỉ dựa trên giá mua ban đầu sẽ bỏ sót phần "
-                "lớn bức tranh. Cần tính cả chi phí năng lượng trên mỗi kilômét, chi phí "
-                "bảo dưỡng định kỳ, tuổi thọ pin và chi phí thay thế. Với pin LiFePO4 có "
-                "độ bền chu kỳ cao, số lần thay thế trong vòng đời khai thác ít hơn, "
-                "kéo theo cả chi phí vật tư lẫn thời gian xe dừng hoạt động giảm theo.",
-            ),
-            (
-                "Chọn cấu hình pin theo đặc thù tuyến",
-                "Cấu hình pin nên đi từ nhu cầu vận hành thật: quãng đường mỗi ca, địa "
-                "hình, tải trọng và số giờ khai thác liên tục. Hoa Huy có dải sản phẩm "
-                "trải từ 48V (25–40Ah) cho phân khúc phổ thông, 60V (25–50Ah), 72V "
-                "(25–100Ah) đến các dòng 76V và 96V cho nhu cầu tầm hoạt động mở rộng. "
-                "Chọn dư gây lãng phí vốn và tăng trọng lượng; chọn thiếu buộc xe phải "
-                "sạc giữa ca.",
-            ),
-            (
-                "Hạ tầng sạc và tổ chức ca kíp",
-                "Chuyển đổi phương tiện luôn đi kèm với thay đổi cách tổ chức vận hành. "
-                "Cần xác định sớm vị trí sạc, công suất nguồn tại điểm tập kết và lịch "
-                "sạc phù hợp với ca làm việc. Với đội xe chạy cường độ cao, mô hình hoán "
-                "đổi pin (battery swapping) là phương án đáng cân nhắc để loại bỏ thời "
-                "gian chờ sạc khỏi giờ khai thác.",
-            ),
-            (
-                "Phương án tài chính linh hoạt",
-                "Với doanh nghiệp muốn hạn chế vốn đầu tư ban đầu, dịch vụ cho thuê pin "
-                "lưu trữ công nghiệp và giải pháp hoán đổi pin của Hoa Huy cho phép "
-                "chuyển một phần chi phí tài sản sang chi phí vận hành theo kỳ. Cách này "
-                "phù hợp trong giai đoạn thử nghiệm, khi quy mô đội xe và nhu cầu thực "
-                "tế còn đang được điều chỉnh.",
-            ),
+            ("Vệ sinh tấm pin",
+             "Bụi, lá cây và phân chim bám trên bề mặt làm giảm lượng ánh sáng đến được "
+             "tế bào quang điện. Ở khu vực nhiều bụi hoặc gần công trường, mức ảnh hưởng "
+             "rõ rệt hơn. Mưa giúp rửa trôi một phần nhưng không thay thế được việc vệ "
+             "sinh định kỳ, nhất là với mái có độ dốc thấp nơi nước dễ đọng lại thành vệt "
+             "bẩn ở mép dưới tấm pin."),
+            ("Theo dõi sản lượng để phát hiện bất thường",
+             "Cách hiệu quả nhất để biết hệ có vấn đề là so sánh sản lượng theo thời "
+             "gian. Hầu hết inverter hiện nay đều có ứng dụng ghi nhận dữ liệu. Nếu sản "
+             "lượng những ngày nắng tốt thấp hơn hẳn so với cùng kỳ trước đó, đó là dấu "
+             "hiệu cần kiểm tra. Thói quen xem lại số liệu mỗi tháng giúp phát hiện sự "
+             "cố sớm, trước khi thất thoát tích lũy thành con số lớn."),
+            ("Kiểm tra đầu nối và dây dẫn",
+             "Các mối nối chịu giãn nở nhiệt liên tục ngày qua ngày, lâu dần có thể lỏng "
+             "và phát nhiệt tại điểm tiếp xúc. Kiểm tra định kỳ tình trạng đầu nối, vỏ "
+             "cách điện của dây dẫn và độ chắc chắn của các điểm cố định là việc nên làm. "
+             "Đây là hạng mục liên quan trực tiếp đến an toàn, không chỉ đến sản lượng, "
+             "nên cần người có chuyên môn thực hiện."),
+            ("Chú ý tới inverter",
+             "Inverter là thiết bị điện tử làm việc liên tục nên thường là bộ phận cần "
+             "chú ý nhất trong hệ. Nên kiểm tra khu vực lắp đặt có thông thoáng không, "
+             "quạt tản nhiệt hoạt động bình thường không, và các cảnh báo lỗi hiển thị "
+             "trên thiết bị hoặc ứng dụng. Xử lý sớm cảnh báo thường đơn giản hơn nhiều "
+             "so với để đến khi thiết bị ngừng hẳn."),
+            ("Kiểm tra phần mái và kết cấu",
+             "Ngoài phần điện, nên kiểm tra định kỳ tình trạng mái phía dưới dàn pin: "
+             "dấu hiệu thấm dột, tình trạng các điểm bắt giá đỡ và độ chắc của khung. "
+             "Phát hiện sớm một điểm thấm nhỏ dễ xử lý hơn nhiều so với khi nước đã ngấm "
+             "vào kết cấu. Việc này nên làm trước mùa mưa bão hằng năm."),
         ],
-        "hashtags": ["#XeDien", "#DoiXeDien", "#VanTaiXanh", "#ChuyenDoiXanh"],
+        "closings": [
+            "Tóm lại, bảo trì hệ thống điện mặt trời gồm bốn việc chính: vệ sinh tấm pin, "
+            "theo dõi sản lượng để phát hiện bất thường, kiểm tra định kỳ đầu nối và kết "
+            "cấu, cùng với việc để mắt tới các cảnh báo của inverter.",
+            "Nói ngắn gọn, một hệ thống không được theo dõi vẫn chạy nhưng có thể đang "
+            "mất sản lượng mỗi ngày. Bảo trì hệ thống điện mặt trời — cụ thể là vệ sinh "
+            "tấm pin và kiểm tra định kỳ — chỉ chiếm ít thời gian nhưng giữ cho khoản "
+            "đầu tư đạt đúng hiệu quả kỳ vọng.",
+        ],
+        "hashtags": ["#BaoTriSolar", "#VeSinhTamPin", "#VanHanhHeThong", "#SolarOM"],
     },
     {
-        "id": "bms-quan-ly-pin",
-        "focus_keyword": "hệ thống quản lý pin BMS",
-        "secondary_keywords": [
-            "cân bằng cell",
-            "bảo vệ quá dòng",
-            "tuổi thọ pin",
-            "thiết kế BMS",
-        ],
-        "closings": [
-            "Tóm lại, hệ thống quản lý pin BMS quyết định phần lớn tuổi thọ pin mà người "
-            "dùng cảm nhận được: từ cân bằng cell, bảo vệ quá dòng và quá nhiệt, cho đến "
-            "việc thiết kế BMS bám đúng đặc thù của từng ứng dụng.",
-            "Nói ngắn gọn, khi thẩm định nhà cung cấp, nên hỏi về hệ thống quản lý pin "
-            "BMS chứ không dừng ở điện áp và dung lượng: cơ chế cân bằng cell, ngưỡng bảo "
-            "vệ quá dòng và năng lực thiết kế BMS riêng là những thứ quyết định tuổi thọ "
-            "pin về sau.",
-        ],
-        "image_query": "battery management system circuit board",
-        "image_alt": "Hệ thống quản lý pin BMS trong khối pin LiFePO4 Hoa Huy Green Energy",
+        "id": "on-grid-off-grid",
+        "focus_keyword": "hệ thống hòa lưới on-grid",
+        "secondary_keywords": ["off-grid", "độc lập", "hybrid", "pin lưu trữ"],
+        "image_query": "solar power grid connection electricity",
+        "image_alt": "So sánh hệ thống điện mặt trời hòa lưới on-grid, độc lập off-grid và hybrid",
         "hooks": [
-            "Hệ thống quản lý pin BMS: thành phần quyết định tuổi thọ mà ít ai hỏi tới.",
-            "Hệ thống quản lý pin BMS làm gì bên trong khối pin lithium?",
-            "Hệ thống quản lý pin BMS — vì sao hai bộ pin cùng thông số lại bền khác nhau?",
+            "Hệ thống hòa lưới on-grid, off-grid hay hybrid — chọn loại nào?",
+            "Hệ thống hòa lưới on-grid: rẻ nhất, nhưng mất điện thì cũng ngừng.",
+            "Hệ thống hòa lưới on-grid và hai lựa chọn còn lại: khác nhau ở đâu?",
         ],
         "intros": [
-            "Hai bộ pin có cùng điện áp và dung lượng danh định vẫn có thể cho tuổi thọ "
-            "khác nhau đáng kể sau vài năm khai thác. Khác biệt thường nằm ở hệ thống "
-            "quản lý pin BMS — thành phần ít được nhắc tới trong bảng thông số nhưng "
-            "quyết định phần lớn độ bền và độ an toàn thực tế của khối pin.",
-            "Khi so sánh báo giá giữa các nhà cung cấp pin lithium, phần chênh lệch khó "
-            "giải thích nhất thường nằm ở chất lượng hệ thống quản lý pin BMS. Hiểu BMS "
-            "làm gì sẽ giúp anh/chị đặt đúng câu hỏi khi thẩm định nhà cung cấp, thay vì "
-            "chỉ so sánh trên hai con số điện áp và dung lượng.",
+            "Ba khái niệm hệ thống hòa lưới on-grid, hệ độc lập off-grid và hệ hybrid "
+            "xuất hiện trong hầu hết tư vấn về điện mặt trời, nhưng không phải ai cũng "
+            "được giải thích rõ. Chọn sai loại ngay từ đầu dẫn tới hoặc chi phí thừa, "
+            "hoặc hệ thống không đáp ứng đúng nhu cầu. Bài viết này phân biệt ba loại "
+            "theo cách dễ hình dung nhất.",
+            "Sự khác nhau giữa hệ thống hòa lưới on-grid, hệ độc lập và hệ hybrid nằm ở "
+            "chỗ hệ có pin lưu trữ hay không, và có phụ thuộc vào lưới điện hay không. "
+            "Hiểu đúng ba loại này giúp anh/chị biết mình thật sự cần gì trước khi nghe "
+            "báo giá.",
         ],
         "sections": [
-            (
-                "Giám sát và bảo vệ theo thời gian thực",
-                "Chức năng cơ bản nhất của BMS là theo dõi liên tục điện áp từng nhánh "
-                "cell, dòng sạc/xả và nhiệt độ khối pin. Khi bất kỳ thông số nào vượt "
-                "ngưỡng an toàn — quá áp, quá dòng, quá nhiệt hoặc xả quá sâu — BMS ngắt "
-                "mạch bảo vệ trước khi hư hỏng lan rộng. Đây là lớp bảo vệ chủ động, "
-                "hoạt động độc lập với thao tác của người vận hành.",
-            ),
-            (
-                "Cân bằng cell và tuổi thọ thực tế",
-                "Một khối pin gồm nhiều cell mắc nối tiếp, và theo thời gian các cell "
-                "không suy giảm hoàn toàn đồng đều. Nếu không có cơ chế cân bằng, cell "
-                "yếu nhất sẽ giới hạn dung lượng dùng được của cả khối và ngày càng "
-                "xuống cấp nhanh hơn. BMS thực hiện cân bằng để giữ các cell trong dải "
-                "hoạt động tương đồng — đây chính là lý do chất lượng BMS ảnh hưởng trực "
-                "tiếp đến tuổi thọ mà người dùng cảm nhận được.",
-            ),
-            (
-                "Đồng đều cell ngay từ khâu lắp ráp",
-                "BMS làm việc hiệu quả hơn nhiều khi các cell đầu vào đã tương đồng. Nhà "
-                "máy Hoa Huy áp dụng quy trình phân loại cell trước khi lắp ráp, để các "
-                "cell trong cùng một khối pin có thông số gần nhau. Kết hợp với dây "
-                "chuyền hàn laser công suất cao đảm bảo chất lượng mối nối, đây là nền "
-                "tảng vật lý mà không thuật toán BMS nào bù đắp được nếu bị bỏ qua.",
-            ),
-            (
-                "Thiết kế BMS theo đặc thù ứng dụng",
-                "Ngưỡng bảo vệ phù hợp cho xe máy điện chạy đường phố khác với xe nâng "
-                "vận hành liên tục trong nhà xưởng, và khác tiếp với hệ lưu trữ ESS sạc "
-                "xả theo chu kỳ ngày. Hoa Huy cung cấp dịch vụ thiết kế BMS và kiến trúc "
-                "pin LiFePO4 theo yêu cầu, để thông số bảo vệ bám sát điều kiện vận hành "
-                "thật thay vì dùng chung một cấu hình mặc định cho mọi ứng dụng.",
-            ),
-            (
-                "Truyền thông với thiết bị và inverter",
-                "Với hệ lưu trữ ESS, BMS cần trao đổi dữ liệu với inverter để phối hợp "
-                "quá trình sạc và xả. Với xe điện, BMS làm việc với bộ điều khiển của "
-                "phương tiện. Đây là điểm cần đối chiếu sớm khi tích hợp vào hệ thống có "
-                "sẵn — sai giao thức truyền thông có thể khiến thiết bị không nhận pin "
-                "dù thông số điện áp hoàn toàn phù hợp.",
-            ),
+            ("Hệ thống hòa lưới on-grid",
+             "Đây là loại phổ biến nhất và có chi phí đầu tư thấp nhất vì không cần pin "
+             "lưu trữ. Hệ gồm tấm pin và inverter, điện tạo ra dùng trực tiếp cho tải, "
+             "phần dư đưa lên lưới. Hạn chế lớn nhất: khi lưới mất điện, hệ tự động ngừng "
+             "hoạt động dù trời đang nắng. Đây là yêu cầu an toàn bắt buộc, nhằm tránh "
+             "gây nguy hiểm cho người sửa chữa trên lưới."),
+            ("Hệ độc lập off-grid",
+             "Hệ off-grid hoạt động hoàn toàn không phụ thuộc lưới điện, nên bắt buộc "
+             "phải có pin lưu trữ để cấp điện khi không có nắng. Loại này phù hợp với khu "
+             "vực chưa có lưới hoặc rất khó kéo lưới tới. Đổi lại, chi phí cao hơn đáng "
+             "kể và cần tính toán dung lượng pin kỹ lưỡng, vì không còn nguồn nào khác "
+             "để dự phòng khi pin cạn."),
+            ("Hệ hybrid",
+             "Hybrid kết hợp ưu điểm của hai loại trên: vẫn đấu nối lưới, đồng thời có "
+             "pin lưu trữ. Nhờ đó hệ vừa tận dụng được lưới như nguồn dự phòng, vừa duy "
+             "trì điện cho nhóm tải ưu tiên khi lưới mất. Đây là lựa chọn cho khu vực có "
+             "lưới nhưng hay mất điện, hoặc gia đình muốn dùng phần điện dư ban ngày vào "
+             "buổi tối."),
+            ("Chọn theo nhu cầu, không theo giá",
+             "Nếu khu vực có lưới ổn định và mục tiêu chính là giảm hóa đơn, hệ hòa lưới "
+             "thường là phương án hợp lý nhất về chi phí. Nếu mất điện gây thiệt hại thật "
+             "sự — hàng hóa trong kho lạnh, thiết bị không được phép dừng — thì phần đầu "
+             "tư thêm cho hybrid là có cơ sở. Off-grid chỉ nên chọn khi thật sự không có "
+             "lưới để đấu nối."),
+            ("Tính trước khả năng nâng cấp",
+             "Nhiều gia đình bắt đầu với hệ hòa lưới rồi vài năm sau muốn bổ sung pin. "
+             "Khi đó, inverter ban đầu có hỗ trợ kết nối pin hay không sẽ quyết định chi "
+             "phí nâng cấp. Vì vậy ngay cả khi chưa lắp pin ngay, việc trao đổi trước về "
+             "khả năng mở rộng ở khâu thiết kế giúp tránh phải thay thiết bị chính về sau."),
         ],
-        "hashtags": ["#BMS", "#QuanLyPin", "#CongNghePin", "#KyThuatPin"],
+        "closings": [
+            "Tóm lại, hệ thống hòa lưới on-grid phù hợp khi lưới ổn định và mục tiêu là "
+            "giảm hóa đơn; hệ hybrid dành cho nơi hay mất điện nhờ có pin lưu trữ; còn hệ "
+            "độc lập off-grid chỉ nên chọn khi không có lưới để đấu nối.",
+            "Nói ngắn gọn, khác biệt giữa hệ thống hòa lưới on-grid, hệ off-grid và hybrid "
+            "nằm ở pin lưu trữ và mức độ phụ thuộc lưới. Hãy chọn theo tần suất mất điện "
+            "và mức thiệt hại khi mất điện, thay vì chọn theo chênh lệch giá đầu tư.",
+        ],
+        "hashtags": ["#OnGrid", "#OffGrid", "#Hybrid", "#DienMatTroi"],
     },
     {
-        "id": "ess-cong-nghiep",
-        "federated": True,
-        "focus_keyword": "lưu trữ năng lượng công nghiệp",
-        "secondary_keywords": [
-            "Stacked ESS",
-            "giờ cao điểm",
-            "cell LiFePO4",
-            "cho thuê pin",
-        ],
-        "closings": [
-            "Tóm lại, hệ thống lưu trữ năng lượng công nghiệp mang lại giá trị kép: dịch "
-            "tải khỏi giờ cao điểm để giảm chi phí điện, và giữ nguồn cho phụ tải quan "
-            "trọng. Dòng Stacked ESS dùng cell LiFePO4 cho phép mở rộng theo module, và "
-            "có thể triển khai qua hình thức cho thuê pin nếu doanh nghiệp muốn hạn chế "
-            "vốn đầu tư.",
-            "Nói ngắn gọn, đầu tư lưu trữ năng lượng công nghiệp nên bắt đầu từ biểu đồ "
-            "phụ tải và mức chênh giá giờ cao điểm của chính nhà máy. Dòng Stacked ESS "
-            "với cell LiFePO4 cho phép mở rộng dần, còn dịch vụ cho thuê pin là lựa chọn "
-            "khi chưa muốn ghi nhận đầu tư tài sản lớn.",
-        ],
-        "image_query": "industrial energy storage container",
-        "image_alt": "Hệ thống lưu trữ năng lượng công nghiệp Stacked ESS Hoa Huy cho nhà máy",
+        "id": "giam-sat-hieu-suat",
+        "focus_keyword": "giám sát hệ thống điện mặt trời",
+        "secondary_keywords": ["sản lượng điện", "cảnh báo lỗi", "ứng dụng theo dõi", "hiệu suất"],
+        "image_query": "solar monitoring app dashboard energy",
+        "image_alt": "Ứng dụng giám sát sản lượng và hiệu suất hệ thống điện mặt trời",
         "hooks": [
-            "Lưu trữ năng lượng công nghiệp: cắt đỉnh tải và giữ sản xuất không gián đoạn.",
-            "Lưu trữ năng lượng công nghiệp cho nhà xưởng — đầu tư theo module, không dồn một lần.",
-            "Lưu trữ năng lượng công nghiệp: bài toán của nhà máy có giá điện giờ cao điểm.",
+            "Giám sát hệ thống điện mặt trời: biết hệ đang chạy tốt hay đang mất tiền mỗi ngày.",
+            "Giám sát hệ thống điện mặt trời — đọc số liệu thế nào cho có ích?",
+            "Giám sát hệ thống điện mặt trời: tính năng có sẵn mà ít người dùng tới.",
         ],
         "intros": [
-            "Với nhà máy và xưởng sản xuất, điện không chỉ là chi phí mà còn là điều "
-            "kiện để dây chuyền vận hành liên tục. Hệ thống lưu trữ năng lượng công "
-            "nghiệp phục vụ hai mục tiêu song song: giảm chi phí điện bằng cách dịch tải "
-            "khỏi giờ cao điểm, và giữ nguồn cho các phụ tải quan trọng khi lưới gặp sự "
-            "cố.",
-            "Đầu tư hệ thống lưu trữ năng lượng công nghiệp thường bị coi là khoản chi "
-            "lớn khó quyết. Nhưng với kiến trúc module hóa, doanh nghiệp có thể bắt đầu "
-            "ở quy mô vừa đủ và mở rộng dần theo tốc độ tăng trưởng của tải tiêu thụ — "
-            "cách tiếp cận giúp dòng tiền và nhu cầu thực tế đi cùng nhịp với nhau.",
+            "Hầu hết hệ điện mặt trời hiện nay đều đi kèm khả năng theo dõi qua ứng dụng, "
+            "nhưng phần lớn chủ nhà chỉ mở ra vài lần trong tuần đầu rồi thôi. Giám sát "
+            "hệ thống điện mặt trời đúng cách là cách rẻ nhất để đảm bảo khoản đầu tư "
+            "đang sinh lợi như kỳ vọng.",
+            "Một hệ điện mặt trời gặp sự cố hiếm khi ngừng hẳn — thường nó chỉ phát ít đi. "
+            "Nếu không có thói quen giám sát hệ thống điện mặt trời, phần sản lượng mất đi "
+            "có thể kéo dài nhiều tháng mà không ai nhận ra. Dưới đây là những chỉ số đáng "
+            "theo dõi và cách hiểu chúng.",
         ],
         "sections": [
-            (
-                "Kiến trúc module hóa, mở rộng theo giai đoạn",
-                "Dòng Stacked ESS của Hoa Huy được thiết kế dạng module xếp chồng. Series "
-                "HHD6 có các phiên bản 5,2 / 10,4 / 15,6 / 20,9 / 26,1 kWh, phù hợp "
-                "xưởng nhỏ và cơ sở kinh doanh. Series HHEC dành cho quy mô công nghiệp "
-                "với 16 / 32 / 48,2 / 64,3 / 80,4 kWh. Doanh nghiệp có thể khởi đầu ở "
-                "mức phù hợp hiện tại rồi bổ sung module khi tải tăng, thay vì đầu tư "
-                "toàn bộ công suất ngay từ đầu.",
-            ),
-            (
-                "Dịch tải khỏi giờ cao điểm",
-                "Với cơ sở áp dụng biểu giá điện theo khung giờ, chênh lệch giữa giờ cao "
-                "điểm và giờ thấp điểm tạo ra dư địa tiết kiệm rõ rệt. Hệ lưu trữ tích "
-                "điện vào khung giờ giá thấp hoặc từ nguồn điện mặt trời áp mái, rồi "
-                "cấp lại cho phụ tải trong khung giờ giá cao. Hiệu quả cụ thể phụ thuộc "
-                "vào biểu đồ phụ tải và biểu giá đang áp dụng, nên cần khảo sát số liệu "
-                "thực tế trước khi tính toán.",
-            ),
-            (
-                "Giữ nguồn cho phụ tải quan trọng",
-                "Ngoài bài toán chi phí, giá trị lớn của ESS công nghiệp nằm ở khả năng "
-                "duy trì nguồn cho các phụ tải không được phép mất điện: hệ thống điều "
-                "khiển, kho lạnh, thiết bị đo lường hay hạ tầng viễn thông. Với nhiều "
-                "dây chuyền, một lần mất điện đột ngột không chỉ dừng sản xuất mà còn "
-                "gây hỏng mẻ nguyên liệu đang xử lý, thiệt hại vượt xa phần điện năng "
-                "bị gián đoạn.",
-            ),
-            (
-                "An toàn và độ bền cho vận hành liên tục",
-                "Toàn bộ dòng ESS của Hoa Huy dùng cell LiFePO4 ở điện áp chuẩn 51.2V — "
-                "hóa học pin được đánh giá cao về độ ổn định nhiệt, phù hợp với hệ thống "
-                "sạc/xả theo chu kỳ ngày trong thời gian dài. Hệ thống BMS giám sát điện "
-                "áp, dòng và nhiệt độ, ngắt bảo vệ khi vượt ngưỡng — yếu tố quan trọng "
-                "khi thiết bị đặt trong khu vực sản xuất có người làm việc.",
-            ),
-            (
-                "Thuê thay vì mua",
-                "Với doanh nghiệp chưa muốn ghi nhận một khoản đầu tư tài sản lớn, Hoa "
-                "Huy có dịch vụ cho thuê pin lưu trữ công nghiệp. Phương án này phù hợp "
-                "khi nhu cầu còn biến động theo mùa vụ, hoặc khi doanh nghiệp muốn đánh "
-                "giá hiệu quả thực tế trên số liệu vận hành của chính mình trước khi "
-                "quyết định đầu tư dài hạn.",
-            ),
+            ("Những chỉ số cơ bản cần nắm",
+             "Hai chỉ số quan trọng nhất là sản lượng điện theo ngày và công suất tức "
+             "thời. Sản lượng ngày cho biết tổng lượng điện hệ tạo ra, còn công suất tức "
+             "thời cho biết hệ đang phát bao nhiêu tại thời điểm xem. Ngoài ra còn có "
+             "sản lượng tích lũy theo tháng và năm — con số hữu ích để so sánh giữa các "
+             "kỳ và đánh giá xu hướng dài hạn."),
+            ("So sánh theo cùng điều kiện thời tiết",
+             "Sai lầm thường gặp là so sánh sản lượng giữa hai ngày có thời tiết khác "
+             "nhau rồi kết luận hệ có vấn đề. Cách đúng là so sánh những ngày nắng tốt "
+             "với nhau, hoặc so tổng sản lượng tháng này với cùng kỳ năm trước. Xu hướng "
+             "giảm rõ rệt trong điều kiện tương đương mới là dấu hiệu đáng để kiểm tra "
+             "kỹ hơn."),
+            ("Dấu hiệu cảnh báo cần lưu ý",
+             "Sản lượng giảm đột ngột thường liên quan đến một chuỗi tấm pin ngừng hoạt "
+             "động hoặc thiết bị bảo vệ đã ngắt. Sản lượng giảm từ từ theo tháng lại "
+             "thường do bụi bẩn tích tụ trên bề mặt tấm pin. Hai kiểu suy giảm này có "
+             "nguyên nhân khác nhau nên cách xử lý cũng khác — nhận diện đúng giúp tiết "
+             "kiệm thời gian tìm lỗi."),
+            ("Thiết lập cảnh báo tự động",
+             "Nhiều ứng dụng cho phép bật thông báo khi hệ gặp lỗi hoặc khi sản lượng "
+             "xuống dưới ngưỡng đặt trước. Bật sẵn tính năng này hiệu quả hơn nhiều so "
+             "với việc phải nhớ mở ứng dụng kiểm tra. Với hệ công suất lớn, nơi mỗi ngày "
+             "gián đoạn đều là một khoản thất thoát đáng kể, đây gần như là việc bắt "
+             "buộc."),
+            ("Lưu số liệu để đối chiếu về sau",
+             "Số liệu sản lượng của những tháng đầu, khi hệ còn mới và sạch, là mốc tham "
+             "chiếu rất có giá trị. Giữ lại dữ liệu này giúp anh/chị đánh giá được hệ "
+             "đang suy giảm ở mức bình thường hay bất thường sau vài năm vận hành, đồng "
+             "thời là căn cứ khi cần làm việc với đơn vị bảo hành về cam kết hiệu suất."),
         ],
-        "hashtags": ["#ESSCongNghiep", "#StackedESS", "#NhaMay", "#TietKiemDien"],
+        "closings": [
+            "Tóm lại, giám sát hệ thống điện mặt trời không cần phức tạp: theo dõi sản "
+            "lượng điện những ngày nắng tốt, bật cảnh báo lỗi tự động trên ứng dụng theo "
+            "dõi, và lưu lại số liệu giai đoạn đầu để đối chiếu hiệu suất về sau.",
+            "Nói ngắn gọn, giám sát hệ thống điện mặt trời là việc tốn ít công nhất nhưng "
+            "bảo vệ khoản đầu tư hiệu quả nhất. Chỉ cần xem lại sản lượng điện mỗi tháng "
+            "và bật cảnh báo lỗi trên ứng dụng theo dõi là đủ để phát hiện sớm hầu hết "
+            "vấn đề.",
+        ],
+        "hashtags": ["#GiamSatSolar", "#SanLuongDien", "#HieuSuat", "#SolarMonitoring"],
     },
 ]
 
@@ -1122,8 +992,8 @@ def _tokenize(text: str) -> list[str]:
 
 
 # Số token đệm cho phép chen giữa các từ của cụm từ khóa. Nhờ đó
-# "pin lithium xe máy điện" vẫn khớp với "pin lithium cho xe máy điện",
-# và "OEM/ODM" khớp với "OEM ODM" — cách các công cụ SEO nhận diện biến thể cụm từ.
+# "điện mặt trời áp mái" vẫn khớp với "điện mặt trời cho áp mái",
+# và "on-grid" khớp với "on grid" — cách các công cụ SEO nhận diện biến thể.
 KEYPHRASE_SLACK = 4
 
 
@@ -1149,7 +1019,6 @@ def keyword_occurrences(text: str, keyword: str) -> int:
         if haystack[i] != needle[0]:
             i += 1
             continue
-        # Khớp lần lượt các token còn lại trong phạm vi cửa sổ cho phép
         pos, matched = i + 1, 1
         limit = min(i + window, len(haystack))
         for token in needle[1:]:
@@ -1168,7 +1037,7 @@ def keyword_occurrences(text: str, keyword: str) -> int:
 
 
 def build_seo_report(content: str, focus_keyword: str, secondary: list[str],
-                     hashtags: list[str]) -> dict:
+                     hashtags: list[str], brand: dict) -> dict:
     """Chấm điểm bài đăng theo các tiêu chí SEO cơ bản."""
     words = count_words(content)
     occurrences = keyword_occurrences(content, focus_keyword)
@@ -1179,6 +1048,7 @@ def build_seo_report(content: str, focus_keyword: str, secondary: list[str],
     sentences = [s for s in re.split(r"[.!?]\s", content) if s.strip()]
     avg_sentence_len = round(words / len(sentences), 1) if sentences else 0.0
     secondary_hits = [kw for kw in secondary if keyword_occurrences(content, kw)]
+    contact = brand.get("hotline") or FIELD_PLACEHOLDERS["hotline"]
 
     checks = {
         "Độ dài thân bài >= 300 từ": words >= MIN_BODY_WORDS,
@@ -1186,7 +1056,7 @@ def build_seo_report(content: str, focus_keyword: str, secondary: list[str],
         "Mật độ từ khóa 0.5–3%": 0.5 <= density <= 3.0,
         "Có >= 2 từ khóa phụ (LSI)": len(secondary_hits) >= 2,
         "Có tiêu đề phụ phân đoạn": content.count("▸") >= 3,
-        "Có CTA kèm thông tin liên hệ": "0904.789.969" in content,
+        "Có CTA kèm thông tin liên hệ": contact in content,
         "Số hashtag trong khoảng 5–10": 5 <= len(hashtags) <= 10,
         "Đoạn văn dễ đọc (>= 6 đoạn)": len(paragraphs) >= 6,
         "Câu trung bình <= 35 từ": avg_sentence_len <= 35,
@@ -1212,9 +1082,11 @@ class SEOPostGenerator:
     """Sinh bài đăng chuẩn SEO, đảm bảo thân bài vượt ngưỡng từ tối thiểu."""
 
     def __init__(self, min_words: int = MIN_BODY_WORDS,
-                 history_file: Path | None = None):
+                 history_file: Path | None = None,
+                 brand: dict | None = None):
         self.min_words = min_words
         self.history_file = history_file if history_file is not None else HISTORY_FILE
+        self.brand = load_brand() if brand is None else brand
 
     # -- lịch sử tránh trùng nội dung --
     def _load_history(self) -> list[str]:
@@ -1238,6 +1110,10 @@ class SEOPostGenerator:
         raw = topic_id + "|" + "|".join(sorted(section_titles))
         return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
 
+    def _available_proofs(self) -> list[dict]:
+        """Chỉ dùng khối uy tín mà cấu hình đã có đủ dữ liệu."""
+        return [p for p in PROOF_TEMPLATES if _has(self.brand, *p["requires"])]
+
     # -- lắp ráp bài đăng --
     def _assemble(self, topic: dict, rng: random.Random) -> tuple[str, list[str], list[str]]:
         hook = rng.choice(topic["hooks"])
@@ -1247,14 +1123,14 @@ class SEOPostGenerator:
         rng.shuffle(sections)
         chosen = sections[:3]
 
-        proof_title, proof_body = rng.choice(PROOF_BLOCKS)
+        proof = rng.choice(self._available_proofs())
         closing = rng.choice(topic["closings"])
-        cta = rng.choice(CTA_BLOCKS)
+        cta = rng.choice(CTA_TEMPLATES).replace("{contact}", contact_line(self.brand))
 
         parts = [hook, "", intro]
         for title, body in chosen:
             parts += ["", f"▸ {title}", body]
-        parts += ["", f"▸ {proof_title}", proof_body]
+        parts += ["", f"▸ {proof['title']}", proof["body"]]
 
         # Phần kết luôn được render nên luôn mang từ khóa chính và các từ khóa
         # phụ, bất kể tổ hợp phần thân nào được chọn ngẫu nhiên ở trên.
@@ -1270,8 +1146,22 @@ class SEOPostGenerator:
         parts += tail
 
         hashtags = topic["hashtags"] + BRAND_HASHTAGS
-        content = "\n".join(parts) + "\n\n" + " ".join(hashtags)
+        content = _fill("\n".join(parts), self.brand) + "\n\n" + " ".join(hashtags)
         return content, hashtags, [t for t, _ in chosen]
+
+    def _build(self, topic: dict, content: str, hashtags: list[str]) -> SEOPost:
+        return SEOPost(
+            content=content,
+            topic_id=topic["id"],
+            focus_keyword=topic["focus_keyword"],
+            hashtags=hashtags,
+            image_query=topic["image_query"],
+            image_alt=topic["image_alt"],
+            seo_report=build_seo_report(
+                content, topic["focus_keyword"],
+                topic["secondary_keywords"], hashtags, self.brand,
+            ),
+        )
 
     def generate(self, topic_id: str | None = None,
                  seed: int | None = None,
@@ -1297,43 +1187,20 @@ class SEOPostGenerator:
             candidates = [t for t in TOPICS if t["id"] not in recent_topics] or list(TOPICS)
             rng.shuffle(candidates)
 
-        content = hashtags = section_titles = None
+        content = hashtags = None
         topic = candidates[0]
         for attempt_topic in candidates:
             for _ in range(6):
                 content, hashtags, section_titles = self._assemble(attempt_topic, rng)
                 fp = f"{attempt_topic['id']}:{self._fingerprint(attempt_topic['id'], section_titles)}"
                 if fp not in history:
-                    topic = attempt_topic
                     history.append(fp)
                     self._save_history(history)
-                    report = build_seo_report(
-                        content, topic["focus_keyword"],
-                        topic["secondary_keywords"], hashtags,
-                    )
-                    return SEOPost(
-                        content=content,
-                        topic_id=topic["id"],
-                        focus_keyword=topic["focus_keyword"],
-                        hashtags=hashtags,
-                        image_query=topic["image_query"],
-                        image_alt=topic["image_alt"],
-                        seo_report=report,
-                    )
+                    return self._build(attempt_topic, content, hashtags)
+            topic = attempt_topic
 
         # Mọi tổ hợp đều đã dùng — chấp nhận lặp lại tổ hợp cũ nhất
-        report = build_seo_report(
-            content, topic["focus_keyword"], topic["secondary_keywords"], hashtags
-        )
-        return SEOPost(
-            content=content,
-            topic_id=topic["id"],
-            focus_keyword=topic["focus_keyword"],
-            hashtags=hashtags,
-            image_query=topic["image_query"],
-            image_alt=topic["image_alt"],
-            seo_report=report,
-        )
+        return self._build(topic, content, hashtags)
 
 
 def generate_post(topic_id: str | None = None, seed: int | None = None,
@@ -1351,12 +1218,43 @@ def daily_rotation_index(now: datetime | None = None) -> int:
     quay lại sau 6 ngày ngay cả khi máy chủ không giữ được file lịch sử.
     """
     now = now or datetime.now(timezone.utc)
-    day_number = now.toordinal()
-    slot = 0 if now.hour < 10 else 1
-    return day_number * 2 + slot
+    return now.toordinal() * 2 + (0 if now.hour < 10 else 1)
 
 
 # --- CLI: xem thử và kiểm tra chất lượng ------------------------------------
+def _print_brand_status() -> int:
+    brand = load_brand()
+    missing = missing_brand_fields(brand)
+    print(f"File cấu hình: {BRAND_CONFIG_FILE}")
+    if not BRAND_CONFIG_FILE.exists():
+        print("❌ Chưa có file brand_config.json.")
+        return 1
+
+    print("\nTrường bắt buộc:")
+    for f in REQUIRED_BRAND_FIELDS:
+        value = str(brand.get(f, "")).strip()
+        print(f"  [{'x' if value else ' '}] {f:<16} {value or '(chưa điền)'}")
+
+    optional = [k for k in brand if k not in REQUIRED_BRAND_FIELDS]
+    print("\nTrường tùy chọn (để trống thì phần nội dung tương ứng bị bỏ qua):")
+    for f in optional:
+        value = brand.get(f)
+        shown = ", ".join(value) if isinstance(value, list) else str(value or "")
+        print(f"  [{'x' if shown else ' '}] {f:<20} {shown or '(chưa điền)'}")
+
+    usable = [p["title"] for p in PROOF_TEMPLATES if _has(brand, *p["requires"])]
+    print(f"\nKhối uy tín dùng được: {len(usable)}/{len(PROOF_TEMPLATES)}")
+    for t in usable:
+        print(f"  - {t}")
+
+    if missing:
+        print(f"\n❌ Còn thiếu trường bắt buộc: {', '.join(missing)}")
+        print("   Script đăng bài sẽ từ chối đăng cho tới khi điền đủ.")
+        return 1
+    print("\n✅ Cấu hình thương hiệu đã đủ để đăng bài.")
+    return 0
+
+
 def _print_post(post: SEOPost) -> None:
     print("=" * 72)
     print(post.content)
@@ -1367,9 +1265,13 @@ def _print_post(post: SEOPost) -> None:
     print(f"Số từ thân bài: {r['body_word_count']}")
     print(f"Mật độ từ khóa: {r['keyword_density_pct']}% ({r['keyword_occurrences']} lần)")
     print(f"Từ khóa phụ  : {', '.join(r['secondary_keywords_used']) or '—'}")
+    print(f"Alt text ảnh : {post.image_alt}")
     print(f"Điểm SEO     : {r['score']}")
     for name, ok in r["checks"].items():
         print(f"  [{'x' if ok else ' '}] {name}")
+
+    if missing_brand_fields():
+        print("\n⚠️  Bản xem thử đang dùng nhãn «...» vì brand_config.json chưa điền đủ.")
 
 
 def _audit(runs: int) -> int:
@@ -1401,14 +1303,18 @@ def _audit(runs: int) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Bộ sinh nội dung chuẩn SEO Hoa Huy")
+    parser = argparse.ArgumentParser(description="Bộ sinh nội dung chuẩn SEO SVPsolar")
     parser.add_argument("--topic", help="ID chủ đề cụ thể (mặc định: tự chọn luân phiên)")
     parser.add_argument("--seed", type=int, help="Seed ngẫu nhiên để tái lập kết quả")
     parser.add_argument("--audit", type=int, metavar="N",
                         help="Sinh thử N bài và kiểm tra toàn bộ tiêu chí SEO")
     parser.add_argument("--list", action="store_true", help="Liệt kê các chủ đề")
+    parser.add_argument("--check-brand", action="store_true",
+                        help="Kiểm tra brand_config.json đã điền đủ chưa")
     args = parser.parse_args()
 
+    if args.check_brand:
+        return _print_brand_status()
     if args.list:
         for t in TOPICS:
             print(f"{t['id']:<32} {t['focus_keyword']}")

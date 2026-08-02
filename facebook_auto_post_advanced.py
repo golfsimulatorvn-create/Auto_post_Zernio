@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 import logging
 
-from content_generator import MIN_BODY_WORDS, generate_post
+from content_generator import MIN_BODY_WORDS, generate_post, missing_brand_fields, load_brand
 
 # Load environment variables
 load_dotenv()
@@ -30,6 +30,8 @@ FACEBOOK_ACCOUNT_ID = os.getenv('FACEBOOK_ACCOUNT_ID', 'YOUR_FACEBOOK_ACCOUNT_ID
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY', '')  # Optional
 
 ARCHIVE_DIR = Path(__file__).parent / 'output' / 'content'
+
+BRAND_NAME = load_brand().get('company_name') or 'SVPsolar'
 
 
 class AdvancedFacebookPoster:
@@ -104,56 +106,74 @@ class AdvancedFacebookPoster:
         except OSError as e:
             logger.warning(f"⚠️  Không lưu được bản sao bài đăng: {e}")
 
-    def post_to_facebook(self, content, image_url=None):
-        """Post content to Facebook via Zernio API"""
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.zernio_api_key}',
-                'Content-Type': 'application/json'
-            }
+    def _build_payload(self, content, image_url=None, image_alt=None):
+        payload = {
+            'content': content,
+            'publishNow': True,
+            'platforms': [
+                {
+                    'platform': 'facebook',
+                    'accountId': self.facebook_account_id
+                }
+            ]
+        }
 
-            payload = {
-                'content': content,
-                'publishNow': True,
-                'platforms': [
-                    {
-                        'platform': 'facebook',
-                        'accountId': self.facebook_account_id
-                    }
-                ]
-            }
+        # Correct Zernio API format for images
+        if image_url:
+            item = {'type': 'image', 'url': image_url}
+            if image_alt:
+                item['altText'] = image_alt
+            payload['mediaItems'] = [item]
 
-            # Correct Zernio API format for images
-            if image_url:
-                payload['mediaItems'] = [
-                    {
-                        'type': 'image',
-                        'url': image_url
-                    }
-                ]
+        return payload
 
-            logger.info("Đang gửi request tới Zernio...")
-            response = requests.post(
-                f'{ZERNIO_BASE_URL}/v1/posts',
-                headers=headers,
-                json=payload,
-                timeout=15
+    def post_to_facebook(self, content, image_url=None, image_alt=None):
+        """Post content to Facebook via Zernio API.
+
+        Gửi kèm altText cho ảnh (tốt cho SEO và khả năng tiếp cận). Nếu Zernio
+        từ chối vì không nhận trường này, gửi lại không kèm thay vì bỏ luôn bài.
+        """
+        headers = {
+            'Authorization': f'Bearer {self.zernio_api_key}',
+            'Content-Type': 'application/json'
+        }
+        can_retry = bool(image_url and image_alt)
+
+        for with_alt in (True, False):
+            payload = self._build_payload(
+                content, image_url, image_alt if with_alt else None
             )
+            try:
+                logger.info("Đang gửi request tới Zernio...")
+                response = requests.post(
+                    f'{ZERNIO_BASE_URL}/v1/posts',
+                    headers=headers,
+                    json=payload,
+                    timeout=15
+                )
+            except Exception as e:
+                logger.error(f"❌ Lỗi Network/Hệ thống: {str(e)}")
+                return False
 
             if response.status_code in [200, 201]:
                 logger.info(f"✅ Đăng bài thành công!")
                 logger.info(f"Content preview: {content[:80]}...")
                 if image_url:
                     logger.info(f"Image kèm theo: {image_url}")
+                    if with_alt:
+                        logger.info(f"Alt text ảnh: {image_alt}")
                 return True
-            else:
-                logger.error(f"❌ Lỗi khi đăng bài: Code {response.status_code}")
-                logger.error(f"Response chi tiết: {response.text}")
-                return False
 
-        except Exception as e:
-            logger.error(f"❌ Lỗi Network/Hệ thống: {str(e)}")
+            if with_alt and can_retry and response.status_code in (400, 422):
+                logger.warning(f"⚠️  Zernio trả về {response.status_code} khi gửi kèm "
+                               f"altText. Thử lại không kèm alt text...")
+                continue
+
+            logger.error(f"❌ Lỗi khi đăng bài: Code {response.status_code}")
+            logger.error(f"Response chi tiết: {response.text}")
             return False
+
+        return False
 
     def _run_post(self, with_image):
         kind = "CÓ HÌNH ẢNH" if with_image else "TEXT"
@@ -166,7 +186,7 @@ class AdvancedFacebookPoster:
             return
 
         image_url = self.fetch_image_from_unsplash(post.image_query) if with_image else None
-        if self.post_to_facebook(post.content, image_url):
+        if self.post_to_facebook(post.content, image_url, post.image_alt):
             self.archive_post(post, image_url)
 
     def scheduled_post_with_image(self):
@@ -195,7 +215,7 @@ class AdvancedFacebookPoster:
 
 if __name__ == "__main__":
     logger.info("=" * 60)
-    logger.info("🌞 Hoa Huy Green Energy - Advanced Auto Facebook Poster")
+    logger.info(f"🌞 {BRAND_NAME} - Advanced Auto Facebook Poster")
     logger.info("=" * 60)
     logger.info(f"⏰ Bắt đầu lúc: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     logger.info("=" * 60)
@@ -207,6 +227,13 @@ if __name__ == "__main__":
 
     if FACEBOOK_ACCOUNT_ID == 'YOUR_FACEBOOK_ACCOUNT_ID' or not FACEBOOK_ACCOUNT_ID:
         logger.error("❌ Lỗi: Chưa cấu hình FACEBOOK_ACCOUNT_ID.")
+        exit(1)
+
+    missing = missing_brand_fields()
+    if missing:
+        logger.error(f"❌ brand_config.json còn thiếu: {', '.join(missing)}.")
+        logger.error("   Điền thông tin SVPsolar rồi chạy lại. "
+                     "Kiểm tra bằng: python content_generator.py --check-brand")
         exit(1)
 
     if not UNSPLASH_ACCESS_KEY:

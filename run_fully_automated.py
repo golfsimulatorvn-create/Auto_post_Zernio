@@ -27,7 +27,7 @@ try:
 except ImportError:
     AI_PIPELINE_AVAILABLE = False
 
-from content_generator import MIN_BODY_WORDS, generate_post
+from content_generator import MIN_BODY_WORDS, generate_post, missing_brand_fields
 
 # --- Setup ---
 load_dotenv()
@@ -111,6 +111,10 @@ def post_to_facebook(content: str, image_url: str | None = None) -> bool:
 def run_seo_fallback_post() -> None:
     """Đăng bài bằng bộ sinh nội dung chuẩn SEO khi pipeline AI chưa sẵn sàng."""
     logger.info("ℹ️  Chưa có module AI (content/). Dùng bộ sinh nội dung chuẩn SEO.")
+    missing = missing_brand_fields()
+    if missing:
+        logger.error("❌ brand_config.json còn thiếu: %s. Hủy đăng.", ", ".join(missing))
+        return
     post = generate_post()
     report = post.seo_report
     logger.info(

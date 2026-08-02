@@ -1,0 +1,28 @@
+{
+  "_huong_dan": [
+    "Điền thông tin thật của SVPsolar vào các trường dưới đây.",
+    "Các trường bắt buộc: company_name, website, hotline.",
+    "Script đăng bài sẽ TỪ CHỐI đăng nếu còn trường bắt buộc bỏ trống —",
+    "đây là chủ ý, để không đăng nhầm thông tin của công ty khác.",
+    "Các trường còn lại là tùy chọn: để trống thì phần nội dung tương ứng",
+    "sẽ được bỏ qua, KHÔNG tự bịa số liệu thay thế.",
+    "Kiểm tra sau khi điền: python content_generator.py --check-brand"
+  ],
+
+  "company_name": "",
+  "short_name": "",
+  "website": "",
+  "hotline": "",
+  "sales_contact": "",
+  "email": "",
+  "address": "",
+
+  "service_area": "",
+  "years_experience": "",
+  "projects_completed": "",
+  "warranty_years": "",
+
+  "certifications": [],
+  "partner_brands": [],
+  "services": []
+}

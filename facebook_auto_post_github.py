@@ -5,7 +5,12 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logging
 
-from content_generator import MIN_BODY_WORDS, daily_rotation_index, generate_post
+from content_generator import (
+    MIN_BODY_WORDS,
+    daily_rotation_index,
+    generate_post,
+    missing_brand_fields, load_brand,
+)
 
 # Load environment variables
 load_dotenv()
@@ -28,6 +33,8 @@ FACEBOOK_ACCOUNT_ID = os.getenv('FACEBOOK_ACCOUNT_ID', 'YOUR_FACEBOOK_ACCOUNT_ID
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY', '')  # Optional
 
 ARCHIVE_DIR = Path(__file__).parent / 'output' / 'content'
+
+BRAND_NAME = load_brand().get('company_name') or 'SVPsolar'
 
 
 class AdvancedFacebookPoster:
@@ -106,60 +113,82 @@ class AdvancedFacebookPoster:
         except OSError as e:
             logger.warning(f"⚠️ Không lưu được bản sao bài đăng: {e}")
 
-    def post_to_facebook(self, content, image_url=None):
-        """Gửi API đăng bài qua Zernio"""
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.zernio_api_key}',
-                'Content-Type': 'application/json'
-            }
+    def _build_payload(self, content, image_url=None, image_alt=None):
+        payload = {
+            'content': content,
+            'publishNow': True,
+            'platforms': [
+                {
+                    'platform': 'facebook',
+                    'accountId': self.facebook_account_id
+                }
+            ]
+        }
 
-            payload = {
-                'content': content,
-                'publishNow': True,
-                'platforms': [
-                    {
-                        'platform': 'facebook',
-                        'accountId': self.facebook_account_id
-                    }
-                ]
-            }
+        # Khắc phục lỗi không hiện ảnh: Dùng mảng mediaItems theo docs Zernio
+        if image_url:
+            item = {'type': 'image', 'url': image_url}
+            if image_alt:
+                item['altText'] = image_alt
+            payload['mediaItems'] = [item]
 
-            # Khắc phục lỗi không hiện ảnh: Dùng mảng mediaItems theo docs Zernio
-            if image_url:
-                payload['mediaItems'] = [
-                    {
-                        'type': 'image',
-                        'url': image_url
-                    }
-                ]
+        return payload
 
-            logger.info("Đang gửi request tới Zernio...")
-            response = requests.post(
-                f'{ZERNIO_BASE_URL}/v1/posts',
-                headers=headers,
-                json=payload,
-                timeout=15
+    def post_to_facebook(self, content, image_url=None, image_alt=None):
+        """Gửi API đăng bài qua Zernio.
+
+        Alt text ảnh có lợi cho SEO và khả năng tiếp cận, nhưng tài liệu Zernio
+        không truy cập được để xác nhận trường `altText` có được chấp nhận khi
+        tạo bài hay không. Vì vậy lần đầu gửi kèm altText; nếu API từ chối vì
+        không nhận trường này thì gửi lại không kèm, để không làm hỏng luồng
+        đăng bài đang chạy được.
+        """
+        headers = {
+            'Authorization': f'Bearer {self.zernio_api_key}',
+            'Content-Type': 'application/json'
+        }
+        can_retry = bool(image_url and image_alt)
+
+        for with_alt in (True, False):
+            payload = self._build_payload(
+                content, image_url, image_alt if with_alt else None
             )
+            try:
+                logger.info("Đang gửi request tới Zernio...")
+                response = requests.post(
+                    f'{ZERNIO_BASE_URL}/v1/posts',
+                    headers=headers,
+                    json=payload,
+                    timeout=15
+                )
+            except Exception as e:
+                logger.error(f"❌ Lỗi Network: {str(e)}")
+                return False
 
             if response.status_code in [200, 201]:
                 logger.info(f"✅ Đăng bài thành công!")
                 if image_url:
                     logger.info(f"Có kèm ảnh: {image_url}")
+                    if with_alt:
+                        logger.info(f"Alt text ảnh: {image_alt}")
                 return True
-            else:
-                logger.error(f"❌ Lỗi khi đăng bài: Code {response.status_code}")
-                logger.error(f"Response: {response.text}")
-                return False
 
-        except Exception as e:
-            logger.error(f"❌ Lỗi Network: {str(e)}")
+            # API từ chối payload — có thể do không nhận trường altText
+            if with_alt and can_retry and response.status_code in (400, 422):
+                logger.warning(f"⚠️ Zernio trả về {response.status_code} khi gửi kèm "
+                               f"altText. Thử lại không kèm alt text...")
+                continue
+
+            logger.error(f"❌ Lỗi khi đăng bài: Code {response.status_code}")
+            logger.error(f"Response: {response.text}")
             return False
+
+        return False
 
 
 if __name__ == "__main__":
     logger.info("=" * 60)
-    logger.info("🌞 Hoa Huy Green Energy - GitHub Actions Auto Poster")
+    logger.info(f"🌞 {BRAND_NAME} - GitHub Actions Auto Poster")
     logger.info("=" * 60)
 
     # Kiểm tra biến môi trường
@@ -168,6 +197,15 @@ if __name__ == "__main__":
         exit(1)
     if FACEBOOK_ACCOUNT_ID == 'YOUR_FACEBOOK_ACCOUNT_ID' or not FACEBOOK_ACCOUNT_ID:
         logger.error("❌ Lỗi: Chưa cấu hình FACEBOOK_ACCOUNT_ID.")
+        exit(1)
+
+    # Chặn đăng khi chưa có thông tin thương hiệu — tránh đăng bài thiếu
+    # thông tin liên hệ hoặc mang thông tin của công ty khác
+    missing = missing_brand_fields()
+    if missing:
+        logger.error(f"❌ brand_config.json còn thiếu: {', '.join(missing)}.")
+        logger.error("   Điền thông tin SVPsolar rồi chạy lại. "
+                     "Kiểm tra bằng: python content_generator.py --check-brand")
         exit(1)
 
     poster = AdvancedFacebookPoster()
@@ -193,7 +231,7 @@ if __name__ == "__main__":
         logger.info("🌃 Chạy ca TỐI (chỉ có text)...")
         image_url = None
 
-    if poster.post_to_facebook(post.content, image_url):
+    if poster.post_to_facebook(post.content, image_url, post.image_alt):
         poster.archive_post(post, image_url)
 
     logger.info("✅ Hoàn tất quy trình GitHub Actions!")

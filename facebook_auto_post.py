@@ -6,7 +6,7 @@ import json
 import os
 from dotenv import load_dotenv
 
-from content_generator import MIN_BODY_WORDS, generate_post
+from content_generator import MIN_BODY_WORDS, generate_post, missing_brand_fields, load_brand
 
 # Load environment variables
 load_dotenv()
@@ -15,6 +15,8 @@ load_dotenv()
 ZERNIO_API_KEY = os.getenv('ZERNIO_API_KEY', 'YOUR_ZERNIO_API_KEY')
 ZERNIO_BASE_URL = 'https://zernio.com/api'
 FACEBOOK_ACCOUNT_ID = os.getenv('FACEBOOK_ACCOUNT_ID', 'YOUR_FACEBOOK_ACCOUNT_ID')
+
+BRAND_NAME = load_brand().get('company_name') or 'SVPsolar'
 
 def generate_post_content() -> str:
     """Sinh bài đăng chuẩn SEO (thân bài > 300 từ)"""
@@ -87,7 +89,7 @@ def schedule_jobs():
 
 if __name__ == "__main__":
     print("=" * 50)
-    print("🌞 Hoa Huy Green Energy - Auto Facebook Poster")
+    print(f"🌞 {BRAND_NAME} - Auto Facebook Poster")
     print("=" * 50)
     print(f"⏰ Bắt đầu lúc: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"📅 Lên lịch: 7 AM & 8 PM mỗi ngày")
@@ -102,6 +104,12 @@ if __name__ == "__main__":
     if FACEBOOK_ACCOUNT_ID == 'YOUR_FACEBOOK_ACCOUNT_ID':
         print("⚠️  CẢNH BÁO: Chưa cấu hình FACEBOOK_ACCOUNT_ID")
         print("Vui lòng cấu hình file .env")
+        exit(1)
+
+    missing = missing_brand_fields()
+    if missing:
+        print(f"❌ brand_config.json còn thiếu: {', '.join(missing)}")
+        print("Kiểm tra bằng: python content_generator.py --check-brand")
         exit(1)
 
     # Start scheduler
