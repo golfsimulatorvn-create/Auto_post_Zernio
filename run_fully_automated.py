@@ -16,9 +16,18 @@ import random
 from dotenv import load_dotenv
 
 # --- Local Imports ---
-from content.ai_writer import write_post_content
-from content.topic_suggester import suggest_topics_from_news
-from content.ai_image_generator import generate_image_for_post
+# Bộ module AI (content/) là tùy chọn và chưa có sẵn trong repo. Khi thiếu,
+# script chuyển sang bộ sinh nội dung chuẩn SEO offline thay vì crash khi import.
+try:
+    from content.ai_writer import write_post_content
+    from content.topic_suggester import suggest_topics_from_news
+    from content.ai_image_generator import generate_image_for_post
+
+    AI_PIPELINE_AVAILABLE = True
+except ImportError:
+    AI_PIPELINE_AVAILABLE = False
+
+from content_generator import MIN_BODY_WORDS, generate_post
 
 # --- Setup ---
 load_dotenv()
@@ -34,7 +43,7 @@ logger = logging.getLogger(__name__)
 ZERNIO_API_KEY = os.getenv("ZERNIO_API_KEY")
 FACEBOOK_ACCOUNT_ID = os.getenv("FACEBOOK_ACCOUNT_ID")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-ZERNIO_BASE_URL = "https://api.zernio.com"
+ZERNIO_BASE_URL = "https://zernio.com/api"
 
 
 def search_recent_news(queries: list[str]) -> list[dict]:
@@ -76,7 +85,8 @@ def post_to_facebook(content: str, image_url: str | None = None) -> bool:
         "platforms": [{"platform": "facebook", "accountId": FACEBOOK_ACCOUNT_ID}],
     }
     if image_url:
-        payload["image"] = image_url
+        # Zernio nhận ảnh qua mảng mediaItems, không phải trường "image"
+        payload["mediaItems"] = [{"type": "image", "url": image_url}]
 
     try:
         response = requests.post(
@@ -98,9 +108,30 @@ def post_to_facebook(content: str, image_url: str | None = None) -> bool:
         return False
 
 
+def run_seo_fallback_post() -> None:
+    """Đăng bài bằng bộ sinh nội dung chuẩn SEO khi pipeline AI chưa sẵn sàng."""
+    logger.info("ℹ️  Chưa có module AI (content/). Dùng bộ sinh nội dung chuẩn SEO.")
+    post = generate_post()
+    report = post.seo_report
+    logger.info(
+        "📊 Chủ đề: %s | Số từ: %s | Mật độ từ khóa: %s%% | Điểm SEO: %s",
+        post.topic_id, report["body_word_count"],
+        report["keyword_density_pct"], report["score"],
+    )
+    if post.word_count < MIN_BODY_WORDS:
+        logger.error("❌ Bài chỉ có %s từ, dưới ngưỡng %s. Hủy đăng.",
+                     post.word_count, MIN_BODY_WORDS)
+        return
+    post_to_facebook(post.content)
+
+
 def run_fully_automated_post():
     """The main function that orchestrates the entire automated workflow."""
     logger.info("🚀 Bắt đầu quy trình đăng bài hoàn toàn tự động...")
+
+    if not AI_PIPELINE_AVAILABLE:
+        run_seo_fallback_post()
+        return
 
     # 1. Search for news
     news_items = search_recent_news(
@@ -146,7 +177,11 @@ if __name__ == "__main__":
     logger.info("SPV Solar - Fully Automated Content Workflow")
     logger.info("=" * 60)
 
-    if not all([ZERNIO_API_KEY, FACEBOOK_ACCOUNT_ID, GEMINI_API_KEY]):
+    required = [ZERNIO_API_KEY, FACEBOOK_ACCOUNT_ID]
+    if AI_PIPELINE_AVAILABLE:
+        required.append(GEMINI_API_KEY)
+
+    if not all(required):
         logger.critical("Lỗi: Vui lòng kiểm tra các biến môi trường ZERNIO_API_KEY, FACEBOOK_ACCOUNT_ID, và GEMINI_API_KEY trong file .env")
     else:
         # Khi chạy trên GitHub Actions, script sẽ được gọi trực tiếp

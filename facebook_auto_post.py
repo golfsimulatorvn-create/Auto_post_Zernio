@@ -3,60 +3,30 @@ import schedule
 import time
 from datetime import datetime
 import json
-from typing import List
 import os
 from dotenv import load_dotenv
+
+from content_generator import MIN_BODY_WORDS, generate_post
 
 # Load environment variables
 load_dotenv()
 
 # Configuration
 ZERNIO_API_KEY = os.getenv('ZERNIO_API_KEY', 'YOUR_ZERNIO_API_KEY')
-ZERNIO_BASE_URL = 'https://api.zernio.com'
+ZERNIO_BASE_URL = 'https://zernio.com/api'
 FACEBOOK_ACCOUNT_ID = os.getenv('FACEBOOK_ACCOUNT_ID', 'YOUR_FACEBOOK_ACCOUNT_ID')
 
-# Topics for content generation
-TOPICS = [
-    "năng lượng mặt trời",
-    "pin lưu trữ năng lượng",
-    "biến tần inverter",
-    "hệ thống điện mặt trời",
-    "năng lượng tái tạo",
-    "pin năng lượng mặt trời",
-    "inverter hybrid",
-    "hệ thống lưu trữ năng lượng"
-]
-
-# Sample content templates
-CONTENT_TEMPLATES = [
-    "💡 Kiến thức về {topic}:\n\n{detail}\n\n#NăngLượngMặtTrời #GreenEnergy #HoaHuy",
-    "🌞 {topic} - Giải pháp năng lượng xanh:\n\n{detail}\n\n#NăngLượngTựatạo #EnergySolution",
-    "⚡ {topic} là gì?\n\n{detail}\n\n#HoaHuyGreenEnergy #SolarPower",
-    "🔋 Tìm hiểu về {topic}:\n\n{detail}\n\n#PinNăngLượng #GreenTech"
-]
-
-# Sample details for each topic
-CONTENT_DETAILS = {
-    "năng lượng mặt trời": "Năng lượng mặt trời là nguồn năng lượng sạch, tái tạo được sử dụng rộng rãi. Nó giúp giảm chi phí điện năng lên đến 70-80% mỗi tháng.",
-    "pin lưu trữ năng lượng": "Pin lưu trữ năng lượng cho phép bạn sử dụng điện từ mặt trời 24/7. Công nghệ hiện đại tăng tuổi thọ pin lên 10-15 năm.",
-    "biến tần inverter": "Biến tần inverter chuyển đổi điện một chiều (DC) từ pin thành điện xoay chiều (AC) để sử dụng các thiết bị điện gia dụng.",
-    "hệ thống điện mặt trời": "Hệ thống điện mặt trời hoàn chỉnh bao gồm tấm pin, biến tần, pin lưu trữ và hệ thống điều khiển thông minh.",
-    "năng lượng tái tạo": "Năng lượng tái tạo như mặt trời, gió giúp bảo vệ môi trường và giảm phụ thuộc vào năng lượng hóa thạch.",
-    "pin năng lượng mặt trời": "Pin năng lượng mặt trời hiệu suất cao, tuổi thọ lâu dài là lựa chọn tối ưu cho hệ thống năng lượng mặt trời.",
-    "inverter hybrid": "Inverter hybrid kết hợp chức năng chuyển đổi điện và quản lý pin, tối ưu hóa việc sử dụng năng lượng.",
-    "hệ thống lưu trữ năng lượng": "Hệ thống lưu trữ năng lượng hiện đại cho phép tiết kiệm điện và sử dụng năng lượng hiệu quả hơn."
-}
-
 def generate_post_content() -> str:
-    """Generate random content from templates and topics"""
-    import random
-
-    topic = random.choice(TOPICS)
-    template = random.choice(CONTENT_TEMPLATES)
-    detail = CONTENT_DETAILS.get(topic, "Tìm hiểu thêm về công nghệ năng lượng mặt trời hiện đại.")
-
-    content = template.format(topic=topic, detail=detail)
-    return content
+    """Sinh bài đăng chuẩn SEO (thân bài > 300 từ)"""
+    post = generate_post()
+    report = post.seo_report
+    print(f"📝 Chủ đề: {post.topic_id} | Từ khóa chính: {post.focus_keyword}")
+    print(f"📊 Số từ: {report['body_word_count']} | "
+          f"Mật độ từ khóa: {report['keyword_density_pct']}% | "
+          f"Điểm SEO: {report['score']}")
+    if report['body_word_count'] < MIN_BODY_WORDS:
+        print(f"⚠️  Bài chỉ có {report['body_word_count']} từ, dưới ngưỡng {MIN_BODY_WORDS}.")
+    return post.content
 
 def post_to_facebook(content: str) -> bool:
     """Post content to Facebook via Zernio API"""

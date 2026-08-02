@@ -47,6 +47,9 @@ env/
 auto_post*.log
 auto_post_*.log
 
+# Lịch sử chống trùng nội dung (sinh lúc chạy)
+output/post_history.json
+
 # Testing
 .pytest_cache/
 .coverage

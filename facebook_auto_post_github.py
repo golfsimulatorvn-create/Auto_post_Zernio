@@ -1,10 +1,11 @@
 import requests
-import time
-from datetime import datetime, timezone
 import os
+from datetime import datetime, timezone
+from pathlib import Path
 from dotenv import load_dotenv
-import random
 import logging
+
+from content_generator import MIN_BODY_WORDS, daily_rotation_index, generate_post
 
 # Load environment variables
 load_dotenv()
@@ -26,44 +27,8 @@ ZERNIO_BASE_URL = 'https://zernio.com/api' # URL chuẩn của Zernio API 2026
 FACEBOOK_ACCOUNT_ID = os.getenv('FACEBOOK_ACCOUNT_ID', 'YOUR_FACEBOOK_ACCOUNT_ID')
 UNSPLASH_ACCESS_KEY = os.getenv('UNSPLASH_ACCESS_KEY', '')  # Optional
 
-# Topics and hashtags
-TOPICS = [
-    "năng lượng mặt trời", "pin lưu trữ năng lượng", "biến tần inverter",
-    "hệ thống điện mặt trời", "năng lượng tái tạo", "pin năng lượng mặt trời",
-    "inverter hybrid", "hệ thống lưu trữ năng lượng", "tấm pin quang điện",
-    "năng lượng xanh"
-]
+ARCHIVE_DIR = Path(__file__).parent / 'output' / 'content'
 
-HASHTAGS = [
-    "#NăngLượngMặtTrời", "#GreenEnergy", "#HoaHuy", "#NăngLượngTựatạo",
-    "#EnergySolution", "#SolarPower", "#PinNăngLượng", "#GreenTech",
-    "#SustainableEnergy", "#EnergyStorage", "#InverterHybrid",
-    "#NăngLượngXanh", "#ĐiệnMặtTrời", "#FutureEnergy"
-]
-
-CONTENT_TEMPLATES = [
-    "💡 Kiến thức về {topic}:\n\n{detail}\n\n{hashtags}",
-    "🌞 {topic} - Giải pháp năng lượng xanh:\n\n{detail}\n\n{hashtags}",
-    "⚡ {topic} là gì?\n\n{detail}\n\n{hashtags}",
-    "🔋 Tìm hiểu về {topic}:\n\n{detail}\n\n{hashtags}",
-    "💰 Tiết kiệm tiền với {topic}:\n\n{detail}\n\n{hashtags}",
-    "🌍 {topic} - Bảo vệ môi trường:\n\n{detail}\n\n{hashtags}",
-    "⚙️ Cách {topic} hoạt động:\n\n{detail}\n\n{hashtags}",
-    "📊 Hiệu suất {topic}:\n\n{detail}\n\n{hashtags}"
-]
-
-CONTENT_DETAILS = {
-    "năng lượng mặt trời": "Năng lượng mặt trời là nguồn năng lượng sạch, tái tạo được sử dụng rộng rãi. Nó giúp giảm chi phí điện năng lên đến 70-80% mỗi tháng. Với hệ thống hiện đại, bạn có thể được độc lập năng lượng hoàn toàn.",
-    "pin lưu trữ năng lượng": "Pin lưu trữ năng lượng cho phép bạn sử dụng điện từ mặt trời 24/7. Công nghệ lithium hiện đại tăng tuổi thọ pin lên 10-15 năm với hiệu suất 90-95%. Đây là giải pháp tối ưu cho năng lượng liên tục.",
-    "biến tần inverter": "Biến tần inverter chuyển đổi điện một chiều (DC) từ pin thành điện xoay chiều (AC) để sử dụng các thiết bị điện gia dụng. Inverter chất lượng cao đảm bảo an toàn và hiệu suất tối đa cho hệ thống của bạn.",
-    "hệ thống điện mặt trời": "Hệ thống điện mặt trời hoàn chỉnh bao gồm tấm pin, biến tần, pin lưu trữ và hệ thống điều khiển thông minh. Một hệ thống tốt có thể hoạt động hiệu quả trong 25-30 năm.",
-    "năng lượng tái tạo": "Năng lượng tái tạo như mặt trời, gió giúp bảo vệ môi trường và giảm phụ thuộc vào năng lượng hóa thạch. Đây là xu hướng phát triển bền vững của tương lai.",
-    "pin năng lượng mặt trời": "Pin năng lượng mặt trời hiệu suất cao, tuổi thọ lâu dài là lựa chọn tối ưu cho hệ thống năng lượng mặt trời. Công nghệ PERC hiện đại cung cấp hiệu suất lên tới 22%.",
-    "inverter hybrid": "Inverter hybrid kết hợp chức năng chuyển đổi điện và quản lý pin, tối ưu hóa việc sử dụng năng lượng. Nó cho phép bạn tối đa hóa lợi ích từ năng lượng mặt trời.",
-    "hệ thống lưu trữ năng lượng": "Hệ thống lưu trữ năng lượng hiện đại cho phép tiết kiệm điện và sử dụng năng lượng hiệu quả hơn. Với pin lưu trữ, bạn có thể sử dụng năng lượng mặt trời vào lúc đêm.",
-    "tấm pin quang điện": "Tấm pin quang điện chuyển ánh sáng mặt trời thành điện năng một cách hiệu quả. Các tấm pin hiện đại có khả năng hoạt động tốt ngay cả khi trời u ám.",
-    "năng lượng xanh": "Năng lượng xanh là năng lượng sạch, không gây ô nhiễm môi trường. Sử dụng năng lượng xanh là cách tuyệt vời để bảo vệ hành tinh của chúng ta."
-}
 
 class AdvancedFacebookPoster:
     def __init__(self):
@@ -71,56 +36,78 @@ class AdvancedFacebookPoster:
         self.facebook_account_id = FACEBOOK_ACCOUNT_ID
         self.unsplash_key = UNSPLASH_ACCESS_KEY
 
-    def get_random_hashtags(self, count=5):
-        """Lấy ngẫu nhiên hashtags"""
-        selected = random.sample(HASHTAGS, min(count, len(HASHTAGS)))
-        return " ".join(selected)
-
-    def fetch_image_from_unsplash(self, topic):
-        """Lấy hình ảnh từ Unsplash dựa theo từ khóa"""
+    def fetch_image_from_unsplash(self, query):
+        """Lấy hình ảnh từ Unsplash theo từ khóa ảnh của chủ đề"""
         if not self.unsplash_key:
             logger.warning("⚠️ UNSPLASH_ACCESS_KEY không tồn tại. Bỏ qua lấy ảnh.")
             return None
 
         try:
-            url = "https://api.unsplash.com/photos/random"
-            
-            # Dịch thô sang tiếng Anh để Unsplash tìm ảnh chuẩn hơn
-            search_query = "solar panel" 
-            if "pin" in topic or "lưu trữ" in topic: search_query = "battery storage"
-            if "xanh" in topic or "tái tạo" in topic: search_query = "green energy"
-            
             params = {
-                'query': search_query,
+                'query': query,
                 'orientation': 'landscape',
                 'client_id': self.unsplash_key
             }
-
-            response = requests.get(url, params=params, timeout=10)
+            response = requests.get(
+                "https://api.unsplash.com/photos/random",
+                params=params,
+                timeout=10,
+            )
             if response.status_code == 200:
-                data = response.json()
-                image_url = data.get('urls', {}).get('regular')
-                logger.info(f"✅ Lấy hình ảnh từ Unsplash thành công: {topic}")
+                image_url = response.json().get('urls', {}).get('regular')
+                logger.info(f"✅ Lấy hình ảnh từ Unsplash thành công: {query}")
                 return image_url
-            else:
-                logger.warning(f"⚠️ Unsplash API lỗi {response.status_code}: {response.text}")
-                return None
+
+            logger.warning(f"⚠️ Unsplash API lỗi {response.status_code}: {response.text}")
+            return None
         except Exception as e:
             logger.error(f"❌ Lỗi khi lấy hình ảnh: {str(e)}")
             return None
 
     def generate_post_content(self):
-        """Sinh nội dung bài đăng ngẫu nhiên"""
-        topic = random.choice(TOPICS)
-        template = random.choice(CONTENT_TEMPLATES)
-        detail = CONTENT_DETAILS.get(topic, "Tìm hiểu thêm về công nghệ năng lượng mặt trời hiện đại.")
-        hashtags = self.get_random_hashtags()
+        """Sinh bài đăng chuẩn SEO (thân bài > 300 từ)
 
-        content = template.format(topic=topic, detail=detail, hashtags=hashtags)
-        return content, topic
+        Runner của GitHub Actions không giữ lại file lịch sử giữa các lần chạy,
+        nên chủ đề được xoay vòng theo ngày + ca đăng để không bị lặp.
+        """
+        post = generate_post(rotation_index=daily_rotation_index())
+        report = post.seo_report
+
+        logger.info(f"📝 Chủ đề: {post.topic_id} | Từ khóa chính: {post.focus_keyword}")
+        logger.info(f"📊 Số từ: {report['body_word_count']} | "
+                    f"Mật độ từ khóa: {report['keyword_density_pct']}% | "
+                    f"Điểm SEO: {report['score']}")
+
+        for name, ok in report['checks'].items():
+            if not ok:
+                logger.warning(f"⚠️ Tiêu chí SEO chưa đạt: {name}")
+
+        return post
+
+    def archive_post(self, post, image_url=None):
+        """Lưu lại bài đã đăng để tra cứu và tránh trùng lặp về sau"""
+        try:
+            ARCHIVE_DIR.mkdir(parents=True, exist_ok=True)
+            stamp = datetime.now().strftime('%Y-%m-%d-%H%M')
+            path = ARCHIVE_DIR / f"{stamp}-{post.topic_id}.md"
+            report = post.seo_report
+            path.write_text(
+                f"# {post.topic_id} — {stamp}\n\n"
+                f"- Từ khóa chính: {post.focus_keyword}\n"
+                f"- Số từ thân bài: {report['body_word_count']}\n"
+                f"- Mật độ từ khóa: {report['keyword_density_pct']}%\n"
+                f"- Điểm SEO: {report['score']}\n"
+                f"- Ảnh: {image_url or '(không có)'}\n"
+                f"- Alt text ảnh (SEO): {post.image_alt}\n\n"
+                f"---\n\n{post.content}\n",
+                encoding='utf-8',
+            )
+            logger.info(f"💾 Đã lưu bài đăng: {path.name}")
+        except OSError as e:
+            logger.warning(f"⚠️ Không lưu được bản sao bài đăng: {e}")
 
     def post_to_facebook(self, content, image_url=None):
-        """Gửi API đăng bài qua Zernio (Cập nhật chuẩn format ảnh)"""
+        """Gửi API đăng bài qua Zernio"""
         try:
             headers = {
                 'Authorization': f'Bearer {self.zernio_api_key}',
@@ -169,11 +156,12 @@ class AdvancedFacebookPoster:
             logger.error(f"❌ Lỗi Network: {str(e)}")
             return False
 
+
 if __name__ == "__main__":
     logger.info("=" * 60)
     logger.info("🌞 Hoa Huy Green Energy - GitHub Actions Auto Poster")
     logger.info("=" * 60)
-    
+
     # Kiểm tra biến môi trường
     if ZERNIO_API_KEY == 'YOUR_ZERNIO_API_KEY' or not ZERNIO_API_KEY:
         logger.error("❌ Lỗi: Chưa cấu hình ZERNIO_API_KEY.")
@@ -183,23 +171,29 @@ if __name__ == "__main__":
         exit(1)
 
     poster = AdvancedFacebookPoster()
-    
+
     # Lấy giờ UTC hiện tại từ GitHub Actions Server
     current_utc_hour = datetime.now(timezone.utc).hour
-    
     logger.info(f"⏰ Giờ chạy máy chủ (UTC): {current_utc_hour}h")
-    
+
+    post = poster.generate_post_content()
+
+    # Chặn đăng nếu bài không đạt độ dài tối thiểu
+    if post.word_count < MIN_BODY_WORDS:
+        logger.error(f"❌ Bài chỉ có {post.word_count} từ, dưới ngưỡng "
+                     f"{MIN_BODY_WORDS}. Hủy đăng.")
+        exit(1)
+
     # GitHub Action chạy lúc 0:00 UTC (7h sáng VN) => Đăng kèm ảnh
-    if current_utc_hour < 10: 
-        logger.info("🌅 Chạy ca SÁNG (kèm hình ảnh)...")
-        content, topic = poster.generate_post_content()
-        image_url = poster.fetch_image_from_unsplash(topic)
-        poster.post_to_facebook(content, image_url)
-        
     # GitHub Action chạy lúc 13:00 UTC (8h tối VN) => Đăng text không ảnh
-    else: 
+    if current_utc_hour < 10:
+        logger.info("🌅 Chạy ca SÁNG (kèm hình ảnh)...")
+        image_url = poster.fetch_image_from_unsplash(post.image_query)
+    else:
         logger.info("🌃 Chạy ca TỐI (chỉ có text)...")
-        content, topic = poster.generate_post_content()
-        poster.post_to_facebook(content)
-        
+        image_url = None
+
+    if poster.post_to_facebook(post.content, image_url):
+        poster.archive_post(post, image_url)
+
     logger.info("✅ Hoàn tất quy trình GitHub Actions!")
