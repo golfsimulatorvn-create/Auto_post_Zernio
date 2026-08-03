@@ -9,20 +9,20 @@
     "Kiểm tra sau khi điền: python content_generator.py --check-brand"
   ],
 
-  "company_name": "",
-  "short_name": "",
-  "website": "",
-  "hotline": "",
-  "sales_contact": "",
-  "email": "",
+  "company_name": "CÔNG TY TNHH ĐẦU TƯ SAO VIỆT PHÁT",
+  "short_name": "SPVSOLAR",
+  "website": "Lithipower.com",
+  "hotline": "0979015311",
+  "sales_contact": "Mr Van",
+  "email": "Evsafevn@gmail.com",
   "address": "",
 
-  "service_area": "",
-  "years_experience": "",
+  "service_area": "- Cung cấp lắp đặt hệ thống năng lượng mặt trời",
+  "years_experience": "10 years",
   "projects_completed": "",
   "warranty_years": "",
 
   "certifications": [],
-  "partner_brands": [],
+  "partner_brands": [Hoa Huy],
   "services": []
 }
