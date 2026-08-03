@@ -1,6 +1,6 @@
 @echo off
 REM ============================================
-REM Hoa Huy Green Energy - Auto Poster Service
+REM SVPsolar - Auto Poster Service
 REM Chạy Facebook Auto Poster 24/7
 REM ============================================
 
@@ -14,7 +14,7 @@ color 0A
 
 echo.
 echo ============================================
-echo 🌞 Hoa Huy Green Energy
+echo 🌞 SVPsolar
 echo    Auto Facebook Poster Service
 echo ============================================
 echo.

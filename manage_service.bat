@@ -1,6 +1,6 @@
 @echo off
 REM ============================================
-REM Hoa Huy Auto Poster - Service Manager
+REM SVPsolar Auto Poster - Service Manager
 REM Quản lý dịch vụ Windows
 REM ============================================
 
@@ -11,7 +11,7 @@ color 0A
 cls
 echo.
 echo ============================================
-echo 🌞 Hoa Huy Auto Poster - Service Manager
+echo 🌞 SVPsolar Auto Poster - Service Manager
 echo ============================================
 echo.
 echo Chọn thao tác:
@@ -41,7 +41,7 @@ echo ============================================
 echo 📋 Trạng thái dịch vụ
 echo ============================================
 echo.
-sc query HoaHuyAutoPost
+sc query SVPsolarAutoPost
 echo.
 pause
 goto menu
@@ -63,7 +63,7 @@ if %errorlevel% neq 0 (
     goto menu
 )
 
-sc query HoaHuyAutoPost >nul 2>&1
+sc query SVPsolarAutoPost >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ Dịch vụ không tồn tại
     echo Vui lòng chạy install_windows_service.bat trước
@@ -71,7 +71,7 @@ if %errorlevel% neq 0 (
     goto menu
 )
 
-net start HoaHuyAutoPost
+net start SVPsolarAutoPost
 if %errorlevel% equ 0 (
     echo ✅ Dịch vụ đã khởi động thành công
 ) else (
@@ -97,14 +97,14 @@ if %errorlevel% neq 0 (
     goto menu
 )
 
-sc query HoaHuyAutoPost >nul 2>&1
+sc query SVPsolarAutoPost >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ Dịch vụ không tồn tại
     pause
     goto menu
 )
 
-net stop HoaHuyAutoPost
+net stop SVPsolarAutoPost
 if %errorlevel% equ 0 (
     echo ✅ Dịch vụ đã dừng thành công
 ) else (
@@ -130,7 +130,7 @@ if %errorlevel% neq 0 (
     goto menu
 )
 
-sc query HoaHuyAutoPost >nul 2>&1
+sc query SVPsolarAutoPost >nul 2>&1
 if %errorlevel% neq 0 (
     echo ❌ Dịch vụ không tồn tại
     pause
@@ -138,11 +138,11 @@ if %errorlevel% neq 0 (
 )
 
 echo ⏹️  Đang dừng dịch vụ...
-net stop HoaHuyAutoPost
+net stop SVPsolarAutoPost
 timeout /t 2 /nobreak
 
 echo ▶️  Đang khởi động dịch vụ...
-net start HoaHuyAutoPost
+net start SVPsolarAutoPost
 
 if %errorlevel% equ 0 (
     echo ✅ Dịch vụ đã khởi động lại thành công
@@ -191,10 +191,10 @@ if %errorlevel% neq 0 (
     goto menu
 )
 
-set /p confirm="⚠️  Bạn chắc chắn muốn xóa dịch vụ HoaHuyAutoPost? (Y/N): "
+set /p confirm="⚠️  Bạn chắc chắn muốn xóa dịch vụ SVPsolarAutoPost? (Y/N): "
 if /i "%confirm%"=="Y" (
     echo ⏹️  Đang dừng dịch vụ...
-    net stop HoaHuyAutoPost >nul 2>&1
+    net stop SVPsolarAutoPost >nul 2>&1
     timeout /t 2 /nobreak
 
     REM Find NSSM
@@ -205,9 +205,9 @@ if /i "%confirm%"=="Y" (
 
     :found_nssm_remove
     if defined NSSM_PATH (
-        "!NSSM_PATH!" remove HoaHuyAutoPost confirm
+        "!NSSM_PATH!" remove SVPsolarAutoPost confirm
     ) else (
-        sc delete HoaHuyAutoPost
+        sc delete SVPsolarAutoPost
     )
 
     if %errorlevel% equ 0 (

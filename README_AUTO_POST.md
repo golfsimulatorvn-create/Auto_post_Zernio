@@ -1,4 +1,4 @@
-# 🌞 Hoa Huy Green Energy - Auto Facebook Poster
+# 🌞 SVPsolar - Auto Facebook Poster
 
 Công cụ tự động tìm kiếm và đăng bài lên Facebook về năng lượng mặt trời, pin lưu trữ, và biến tần inverter.
 
@@ -21,7 +21,7 @@ Công cụ tự động tìm kiếm và đăng bài lên Facebook về năng lư
 ### 1. Clone hoặc tải file script
 
 ```bash
-cd "D:\1. CLAUDE\HOA HUY\Hoa huy green energy"
+cd "D:\SVPsolar\Auto_post_Zernio"
 ```
 
 ### 2. Cài đặt các thư viện cần thiết
@@ -90,18 +90,18 @@ Nhấn `Ctrl + C` để dừng chương trình.
 #### Cách 1: Dùng Task Scheduler
 1. Mở **Task Scheduler** (Win + R → `taskschd.msc`)
 2. Tạo task mới:
-   - **Name:** Hoa Huy Auto Post
+   - **Name:** SVPsolar Auto Post
    - **Trigger:** At startup (hoặc daily)
    - **Action:** Start a program → `C:\Python311\python.exe` (hoặc đường dẫn Python của bạn)
    - **Arguments:** `facebook_auto_post.py`
-   - **Start in:** `D:\1. CLAUDE\HOA HUY\Hoa huy green energy`
+   - **Start in:** `D:\SVPsolar\Auto_post_Zernio`
 
 #### Cách 2: Dùng NSSM (Non-Sucking Service Manager)
 1. Tải NSSM: https://nssm.cc/download
 2. Chạy:
 ```bash
-nssm install HoaHuyAutoPost "C:\Python311\python.exe" "facebook_auto_post.py"
-nssm start HoaHuyAutoPost
+nssm install SVPsolarAutoPost "C:\Python311\python.exe" "facebook_auto_post.py"
+nssm start SVPsolarAutoPost
 ```
 
 ### Trên Linux/Mac:
@@ -119,35 +119,47 @@ Thêm dòng:
 
 ## 📝 Tùy chỉnh Nội dung
 
+Toàn bộ nội dung nằm trong `content_generator.py`, không còn nằm rải rác trong
+các script đăng bài. Chi tiết đầy đủ xem `SEO_CONTENT_GUIDE.md`.
+
+### Trước tiên: điền thông tin công ty
+
+Mở `brand_config.json` và điền tối thiểu `company_name`, `website`, `hotline`.
+Script sẽ **từ chối đăng** cho tới khi điền đủ — đây là chủ ý để không đăng bài
+thiếu thông tin liên hệ.
+
+```bash
+python content_generator.py --check-brand
+```
+
+Các trường tùy chọn (`service_area`, `years_experience`, `projects_completed`,
+`warranty_years`, `certifications`, `partner_brands`) mỗi trường mở khóa thêm
+một khối uy tín trong bài. Để trống thì khối đó bị bỏ qua, không tự điền số.
+
 ### Thêm chủ đề mới
 
-Mở file `facebook_auto_post.py` và chỉnh sửa:
+Thêm một mục vào danh sách `TOPICS` trong `content_generator.py`. Mỗi chủ đề
+cần: `focus_keyword`, `secondary_keywords`, `hooks`, `intros`, tối thiểu 5
+`sections`, `closings`, `hashtags`, `image_query`, `image_alt`.
 
-```python
-TOPICS = [
-    "năng lượng mặt trời",
-    "pin lưu trữ năng lượng",
-    # Thêm chủ đề mới ở đây
-]
+Hai nguyên tắc bắt buộc:
+
+- Phần thân **không chứa khẳng định riêng về công ty** — mọi thông tin thương
+  hiệu chỉ đến từ `brand_config.json`.
+- **Không đưa số liệu tiết kiệm hay hoàn vốn cụ thể**, vì chúng phụ thuộc bức
+  xạ khu vực và mức tiêu thụ của từng công trình.
+
+Sau khi thêm, chạy kiểm tra chất lượng:
+
+```bash
+python content_generator.py --audit 100   # exit code 1 nếu có bài không đạt
 ```
 
-### Thêm template nội dung mới
+### Xem thử trước khi đăng
 
-```python
-CONTENT_TEMPLATES = [
-    "Template 1 với {topic} và {detail}",
-    "Template 2 với {topic} và {detail}",
-    # Thêm template mới ở đây
-]
-```
-
-### Thêm nội dung chi tiết
-
-```python
-CONTENT_DETAILS = {
-    "chủ đề mới": "Nội dung chi tiết về chủ đề này...",
-    # Thêm chi tiết mới
-}
+```bash
+python content_generator.py --list                 # liệt kê 12 chủ đề
+python content_generator.py --topic chon-inverter  # xem thử một bài + báo cáo SEO
 ```
 
 ## 🔄 Nâng cấp - Tìm kiếm nội dung động
@@ -217,7 +229,7 @@ logging.basicConfig(
 
 ## 📄 License
 
-Dự án này là của Hoa Huy Green Energy.
+Dự án này là của SVPsolar.
 
 ---
 

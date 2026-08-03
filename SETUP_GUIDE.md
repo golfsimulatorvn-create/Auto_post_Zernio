@@ -1,4 +1,4 @@
-# 🌞 Hoa Huy Green Energy - Complete Setup Guide
+# 🌞 SVPsolar - Complete Setup Guide
 
 Hướng dẫn chi tiết cài đặt và sử dụng tất cả các tính năng của Auto Facebook Poster.
 
@@ -71,7 +71,7 @@ Hướng dẫn chi tiết cài đặt và sử dụng tất cả các tính năn
 ```bash
 # Mở PowerShell hoặc Command Prompt
 # Điều hướng tới thư mục dự án
-cd "D:\1. CLAUDE\HOA HUY\Hoa huy green energy"
+cd "D:\SVPsolar\Auto_post_Zernio"
 ```
 
 ### Bước 2: Tạo File `.env`
@@ -191,8 +191,8 @@ Chạy `manage_service.bat` → Chọn **1** → **Enter**
 
 Kết quả:
 ```
-SERVICE_NAME        : HoaHuyAutoPost
-DISPLAY_NAME        : HoaHuyAutoPost
+SERVICE_NAME        : SVPsolarAutoPost
+DISPLAY_NAME        : SVPsolarAutoPost
         TYPE                : 10 WIN32_OWN_PROCESS
         STATE               : 4 RUNNING
         WIN32_EXIT_CODE     : 0
@@ -236,81 +236,50 @@ Chạy `manage_service.bat` → Chọn **6** → **Enter** → **Y**
 
 ---
 
-## ✨ Tùy Chỉnh Nội Dung
+## 📝 Tùy chỉnh Nội dung
 
-### Thêm Chủ Đề Mới
+Toàn bộ nội dung nằm trong `content_generator.py`, không còn nằm rải rác trong
+các script đăng bài. Chi tiết đầy đủ xem `SEO_CONTENT_GUIDE.md`.
 
-Mở `facebook_auto_post_advanced.py` và tìm:
+### Trước tiên: điền thông tin công ty
 
-```python
-TOPICS = [
-    "năng lượng mặt trời",
-    "pin lưu trữ năng lượng",
-    # Thêm chủ đề mới ở đây
-]
+Mở `brand_config.json` và điền tối thiểu `company_name`, `website`, `hotline`.
+Script sẽ **từ chối đăng** cho tới khi điền đủ — đây là chủ ý để không đăng bài
+thiếu thông tin liên hệ.
+
+```bash
+python content_generator.py --check-brand
 ```
 
-Thêm dòng:
-```python
-    "tên chủ đề mới",
+Các trường tùy chọn (`service_area`, `years_experience`, `projects_completed`,
+`warranty_years`, `certifications`, `partner_brands`) mỗi trường mở khóa thêm
+một khối uy tín trong bài. Để trống thì khối đó bị bỏ qua, không tự điền số.
+
+### Thêm chủ đề mới
+
+Thêm một mục vào danh sách `TOPICS` trong `content_generator.py`. Mỗi chủ đề
+cần: `focus_keyword`, `secondary_keywords`, `hooks`, `intros`, tối thiểu 5
+`sections`, `closings`, `hashtags`, `image_query`, `image_alt`.
+
+Hai nguyên tắc bắt buộc:
+
+- Phần thân **không chứa khẳng định riêng về công ty** — mọi thông tin thương
+  hiệu chỉ đến từ `brand_config.json`.
+- **Không đưa số liệu tiết kiệm hay hoàn vốn cụ thể**, vì chúng phụ thuộc bức
+  xạ khu vực và mức tiêu thụ của từng công trình.
+
+Sau khi thêm, chạy kiểm tra chất lượng:
+
+```bash
+python content_generator.py --audit 100   # exit code 1 nếu có bài không đạt
 ```
 
-Và thêm chi tiết vào `CONTENT_DETAILS`:
+### Xem thử trước khi đăng
 
-```python
-CONTENT_DETAILS = {
-    "tên chủ đề mới": "Nội dung chi tiết về chủ đề này...",
-}
+```bash
+python content_generator.py --list                 # liệt kê 12 chủ đề
+python content_generator.py --topic chon-inverter  # xem thử một bài + báo cáo SEO
 ```
-
-### Thêm Template Nội Dung
-
-Tìm:
-```python
-CONTENT_TEMPLATES = [
-    "💡 Kiến thức về {topic}:...",
-    # Thêm template mới
-]
-```
-
-Thêm:
-```python
-    "🎯 {topic} - Lựa chọn tốt:\n\n{detail}\n\n{hashtags}",
-```
-
-### Thêm Hashtags
-
-Tìm:
-```python
-HASHTAGS = [
-    "#NăngLượngMặtTrời",
-    # Thêm hashtag mới
-]
-```
-
-Thêm:
-```python
-    "#HashtagMới",
-```
-
-### Thay Đổi Thời Gian Đăng Bài
-
-Tìm trong `facebook_auto_post_advanced.py`:
-
-```python
-schedule.every().day.at("07:00").do(self.scheduled_post_with_image)
-schedule.every().day.at("20:00").do(self.scheduled_post)
-```
-
-Sửa thành:
-```python
-schedule.every().day.at("09:00").do(self.scheduled_post_with_image)  # 9 AM
-schedule.every().day.at("18:00").do(self.scheduled_post)             # 6 PM
-```
-
-⏰ **Định Dạng:** "HH:MM" (24 giờ)
-
----
 
 ## 🐛 Xử Lý Lỗi
 
@@ -439,7 +408,7 @@ powershell -Command "Get-Content 'auto_post.log' -Wait -Tail 10"
 
 ## 🎉 Hoàn Tất!
 
-Chúc mừng! Bạn đã cài đặt thành công Auto Facebook Poster cho Hoa Huy Green Energy.
+Chúc mừng! Bạn đã cài đặt thành công Auto Facebook Poster cho SVPsolar.
 
 Dịch vụ sẽ:
 - ✅ Tự động đăng bài vào **7 AM** (với hình ảnh)
@@ -453,4 +422,4 @@ Dịch vụ sẽ:
 
 **Phiên bản:** 2.0  
 **Cập nhật lần cuối:** 2024  
-**Được tạo cho:** Hoa Huy Green Energy
+**Được tạo cho:** SVPsolar

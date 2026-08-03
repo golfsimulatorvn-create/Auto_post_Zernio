@@ -93,7 +93,7 @@ Nhấp **Add secret** → Lặp lại cho 2 secret còn lại.
    - Repository → Tab **Actions**
    
 2. **Xem Workflows**
-   - Left sidebar: "🌞 Hoa Huy Auto Facebook Poster"
+   - Left sidebar: "🌞 SVPsolar Auto Facebook Poster"
    
 3. **Chạy Thủ Công (Test)**
    - Chọn workflow
@@ -156,7 +156,7 @@ schedule:
 ### Xem Lịch Sử Chạy
 
 1. **Repository → Actions**
-2. **Chọn workflow:** "🌞 Hoa Huy Auto Facebook Poster"
+2. **Chọn workflow:** "🌞 SVPsolar Auto Facebook Poster"
 3. **Xem các lần chạy** - Hiển thị tất cả các lần chạy
 
 ### Xem Chi Tiết Logs

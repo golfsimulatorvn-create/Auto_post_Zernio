@@ -1,4 +1,4 @@
-# 🌞 Hoa Huy Green Energy - Facebook Auto Poster Complete Suite
+# 🌞 SVPsolar - Facebook Auto Poster Complete Suite
 
 Hệ thống tự động đăng bài lên Facebook về năng lượng mặt trời, pin lưu trữ, và biến tần inverter.
 
@@ -32,9 +32,13 @@ Hệ thống tự động đăng bài lên Facebook về năng lượng mặt tr
 ## 📁 Cấu Trúc File
 
 ```
-Hoa huy green energy/
+Auto_post_Zernio/
+├── content_generator.py               # ⭐ Bộ sinh nội dung chuẩn SEO (>300 từ)
+├── brand_config.json                  # ⭐ Thông tin công ty — PHẢI ĐIỀN TRƯỚC
+│
 ├── facebook_auto_post.py              # Script cơ bản
-├── facebook_auto_post_advanced.py     # Script nâng cấp ⭐ DÙNG CÁI NÀY
+├── facebook_auto_post_advanced.py     # Script nâng cấp (chạy thường trú)
+├── facebook_auto_post_github.py       # Bản chạy trên GitHub Actions
 ├── .env.example                       # Mẫu cấu hình
 ├── .env                               # Cấu hình thực tế (tạo từ .env.example)
 ├── requirements.txt                   # Thư viện cần thiết
@@ -45,6 +49,7 @@ Hoa huy green energy/
 │
 ├── QUICK_START.md                     # 📌 Bắt đầu nhanh (5 phút)
 ├── SETUP_GUIDE.md                     # Hướng dẫn chi tiết
+├── SEO_CONTENT_GUIDE.md               # Hệ thống nội dung chuẩn SEO
 ├── README_AUTO_POST.md                # Hướng dẫn script cơ bản
 ├── README_COMPLETE.md                 # File này
 │
@@ -146,45 +151,50 @@ schedule.every().day.at("09:00").do(self.scheduled_post_with_image)
 schedule.every().day.at("18:00").do(self.scheduled_post)
 ```
 
-### Thêm Chủ Đề Mới
+### Tùy Chỉnh Nội Dung
 
-Tìm trong `facebook_auto_post_advanced.py`:
+Toàn bộ nội dung nằm trong `content_generator.py`, không còn nằm rải rác trong
+các script đăng bài. Chi tiết đầy đủ xem `SEO_CONTENT_GUIDE.md`.
 
-```python
-TOPICS = [
-    "năng lượng mặt trời",
-    "pin lưu trữ năng lượng",
-    # Thêm chủ đề mới ở đây
-]
+### Trước tiên: điền thông tin công ty
+
+Mở `brand_config.json` và điền tối thiểu `company_name`, `website`, `hotline`.
+Script sẽ **từ chối đăng** cho tới khi điền đủ — đây là chủ ý để không đăng bài
+thiếu thông tin liên hệ.
+
+```bash
+python content_generator.py --check-brand
 ```
 
-Thêm:
-```python
-    "tên chủ đề mới",
+Các trường tùy chọn (`service_area`, `years_experience`, `projects_completed`,
+`warranty_years`, `certifications`, `partner_brands`) mỗi trường mở khóa thêm
+một khối uy tín trong bài. Để trống thì khối đó bị bỏ qua, không tự điền số.
+
+### Thêm chủ đề mới
+
+Thêm một mục vào danh sách `TOPICS` trong `content_generator.py`. Mỗi chủ đề
+cần: `focus_keyword`, `secondary_keywords`, `hooks`, `intros`, tối thiểu 5
+`sections`, `closings`, `hashtags`, `image_query`, `image_alt`.
+
+Hai nguyên tắc bắt buộc:
+
+- Phần thân **không chứa khẳng định riêng về công ty** — mọi thông tin thương
+  hiệu chỉ đến từ `brand_config.json`.
+- **Không đưa số liệu tiết kiệm hay hoàn vốn cụ thể**, vì chúng phụ thuộc bức
+  xạ khu vực và mức tiêu thụ của từng công trình.
+
+Sau khi thêm, chạy kiểm tra chất lượng:
+
+```bash
+python content_generator.py --audit 100   # exit code 1 nếu có bài không đạt
 ```
 
-Và thêm chi tiết:
-```python
-CONTENT_DETAILS = {
-    "tên chủ đề mới": "Nội dung chi tiết...",
-}
+### Xem thử trước khi đăng
+
+```bash
+python content_generator.py --list                 # liệt kê 12 chủ đề
+python content_generator.py --topic chon-inverter  # xem thử một bài + báo cáo SEO
 ```
-
-### Thêm Hashtags
-
-Tìm:
-```python
-HASHTAGS = [
-    "#NăngLượngMặtTrời",
-]
-```
-
-Thêm:
-```python
-    "#HashtagMới",
-```
-
----
 
 ## 🐛 Xử Lý Lỗi
 
@@ -306,13 +316,13 @@ powershell -Command "Get-Content 'auto_post.log' -Wait -Tail 10"
 
 ## 📄 License
 
-Dự án này được phát triển cho **Hoa Huy Green Energy**.
+Dự án này được phát triển cho **SVPsolar**.
 
 ---
 
 ## 🎉 Hoàn Tất!
 
-Chúc mừng! Bạn đã cài đặt thành công **Facebook Auto Poster** cho Hoa Huy Green Energy.
+Chúc mừng! Bạn đã cài đặt thành công **Facebook Auto Poster** cho SVPsolar.
 
 ### Tiếp Theo:
 1. ✅ Cấu hình API keys
@@ -330,4 +340,4 @@ Chúc mừng! Bạn đã cài đặt thành công **Facebook Auto Poster** cho H
 
 ---
 
-**Made with ❤️ for Hoa Huy Green Energy**
+**Made with ❤️ for SVPsolar**

@@ -11,7 +11,7 @@ git init
 git remote add origin https://github.com/your-username/hoa-huy-auto-poster.git
 git branch -M main
 git add .
-git commit -m "Initial commit: Hoa Huy Auto Poster"
+git commit -m "Initial commit: SVPsolar Auto Poster"
 git push -u origin main
 ```
 
@@ -50,7 +50,7 @@ Secret: your_unsplash_key_here
 ## 3️⃣ Test (1 phút)
 
 1. **Repository → Actions tab**
-2. **Chọn:** "🌞 Hoa Huy Auto Facebook Poster"
+2. **Chọn:** "🌞 SVPsolar Auto Facebook Poster"
 3. **Nhấp:** "Run workflow" → "Run workflow"
 4. **Chờ:** 2-3 phút để chạy xong
 

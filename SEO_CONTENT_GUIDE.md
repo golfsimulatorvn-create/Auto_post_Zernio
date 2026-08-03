@@ -153,14 +153,3 @@ python content_generator.py --audit 100
    luôn được render. Hook và mở bài cũng nên chứa từ khóa chính — với cụm từ
    khóa dài (5-6 từ), cần đủ 3 lần xuất hiện mới đạt ngưỡng mật độ 0.5%.
 5. Chạy `--audit` sau khi thêm để xác nhận không phá vỡ tiêu chí nào.
-
-## Lưu ý về các file trong repo không thuộc SVPsolar
-
-Repo còn chứa tài liệu và dữ liệu của một công ty khác (Hoa Huy Green Energy —
-pin lithium): `brand-guideline.md`, `customer-persona.md`, `product-catalog.md`,
-`marketing-channels.md`, thư mục `Products/`, `DKKD Hoa Huy.pdf`, và các bài cũ
-trong `output/content/`.
-
-**Bộ sinh nội dung hiện tại không đọc bất kỳ file nào trong số đó.** Chúng được
-giữ lại vì có thể đang phục vụ mục đích khác, nhưng nếu repo này chỉ dùng cho
-SVPsolar thì nên dọn đi để tránh nhầm lẫn về sau.
