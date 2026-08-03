@@ -6,7 +6,7 @@ import json
 import os
 from dotenv import load_dotenv
 
-from content_generator import MIN_BODY_WORDS, generate_post, missing_brand_fields, load_brand
+from content_generator import MIN_BODY_WORDS, generate_post, missing_brand_fields, load_brand, brand_config_error
 
 # Load environment variables
 load_dotenv()
@@ -104,6 +104,11 @@ if __name__ == "__main__":
     if FACEBOOK_ACCOUNT_ID == 'YOUR_FACEBOOK_ACCOUNT_ID':
         print("⚠️  CẢNH BÁO: Chưa cấu hình FACEBOOK_ACCOUNT_ID")
         print("Vui lòng cấu hình file .env")
+        exit(1)
+
+    config_error = brand_config_error()
+    if config_error:
+        print(f"❌ {config_error}")
         exit(1)
 
     missing = missing_brand_fields()

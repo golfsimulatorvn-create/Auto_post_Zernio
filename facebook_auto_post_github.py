@@ -9,7 +9,7 @@ from content_generator import (
     MIN_BODY_WORDS,
     daily_rotation_index,
     generate_post,
-    missing_brand_fields, load_brand,
+    missing_brand_fields, load_brand, brand_config_error,
 )
 
 # Load environment variables
@@ -201,6 +201,12 @@ if __name__ == "__main__":
 
     # Chặn đăng khi chưa có thông tin thương hiệu — tránh đăng bài thiếu
     # thông tin liên hệ hoặc mang thông tin của công ty khác
+    config_error = brand_config_error()
+    if config_error:
+        logger.error(f"❌ {config_error}")
+        logger.error("   File không đọc được nên mọi trường bị coi là trống.")
+        exit(1)
+
     missing = missing_brand_fields()
     if missing:
         logger.error(f"❌ brand_config.json còn thiếu: {', '.join(missing)}.")

@@ -6,23 +6,25 @@
     "đây là chủ ý, để không đăng nhầm thông tin của công ty khác.",
     "Các trường còn lại là tùy chọn: để trống thì phần nội dung tương ứng",
     "sẽ được bỏ qua, KHÔNG tự bịa số liệu thay thế.",
+    "LƯU Ý CÚ PHÁP: mọi giá trị chữ phải nằm trong dấu ngoặc kép.",
+    "Danh sách viết dạng [\"mục 1\", \"mục 2\"], để trống là [].",
     "Kiểm tra sau khi điền: python content_generator.py --check-brand"
   ],
 
   "company_name": "CÔNG TY TNHH ĐẦU TƯ SAO VIỆT PHÁT",
-  "short_name": "SPVSOLAR",
-  "website": "Lithipower.com",
+  "short_name": "SVPsolar",
+  "website": "lithipower.com",
   "hotline": "0979015311",
   "sales_contact": "Mr Van",
   "email": "Evsafevn@gmail.com",
   "address": "",
 
-  "service_area": "- Cung cấp lắp đặt hệ thống năng lượng mặt trời",
-  "years_experience": "10 years",
+  "service_area": "",
+  "years_experience": "10",
   "projects_completed": "",
   "warranty_years": "",
 
   "certifications": [],
-  "partner_brands": [Hoa Huy],
-  "services": []
+  "partner_brands": ["Hoa Huy"],
+  "services": ["Cung cấp và lắp đặt hệ thống năng lượng mặt trời"]
 }

@@ -49,13 +49,33 @@ FIELD_PLACEHOLDERS = {
 
 # --- Nạp và kiểm tra cấu hình thương hiệu -----------------------------------
 def load_brand(path: Path | None = None) -> dict:
-    """Đọc brand_config.json. Thiếu file thì trả về cấu hình rỗng."""
+    """Đọc brand_config.json. Thiếu file hoặc sai cú pháp thì trả về rỗng.
+
+    Dùng kèm `brand_config_error()` để biết vì sao rỗng — một lỗi cú pháp JSON
+    nhỏ (quên dấu ngoặc kép) làm cả file không đọc được, và nếu chỉ báo "chưa
+    điền" thì rất khó lần ra nguyên nhân.
+    """
     path = path or BRAND_CONFIG_FILE
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
     return {k: v for k, v in data.items() if not k.startswith("_")}
+
+
+def brand_config_error(path: Path | None = None) -> str | None:
+    """Mô tả lỗi khiến brand_config.json không đọc được, hoặc None nếu ổn."""
+    path = path or BRAND_CONFIG_FILE
+    if not path.exists():
+        return f"Không tìm thấy {path.name}"
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        return (f"{path.name} sai cú pháp JSON tại dòng {e.lineno}, cột {e.colno} "
+                f"({e.msg}). Kiểm tra dấu ngoặc kép và dấu phẩy quanh vị trí đó.")
+    except OSError as e:
+        return f"Không đọc được {path.name}: {e}"
+    return None
 
 
 def missing_brand_fields(brand: dict | None = None) -> list[str]:
@@ -1226,8 +1246,12 @@ def _print_brand_status() -> int:
     brand = load_brand()
     missing = missing_brand_fields(brand)
     print(f"File cấu hình: {BRAND_CONFIG_FILE}")
-    if not BRAND_CONFIG_FILE.exists():
-        print("❌ Chưa có file brand_config.json.")
+
+    error = brand_config_error()
+    if error:
+        print(f"\n❌ {error}")
+        print("   Toàn bộ file không đọc được nên mọi trường đều bị coi là trống,")
+        print("   kể cả những trường đã điền. Sửa lỗi cú pháp rồi chạy lại.")
         return 1
 
     print("\nTrường bắt buộc:")
